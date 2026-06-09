@@ -1078,20 +1078,19 @@ const WALK_FRAMES = 6;
 // ═══════════════════════════════════════════════════
 //  OUTSIDE TILESET layout (128×432 px)
 //  Exact pixel coordinates per building type:
-//  red_house_small: x=0,y=176, 80×80px (5×5 tiles)
-//  red_house_large: x=0,y=256, 80×96px (5×6 tiles)
-//  blue_house:      x=0,y=352, 80×80px (5×5 tiles)
-//  tree:            x=0,y=80,  32×80px (2×5 tiles)
+//  red_small:  x=0, y=176, 80×48px  → clean roof+wall, no double roof
+//  red_large:  x=0, y=256, 80×64px  → large red house complete
+//  blue:       x=0, y=352, 80×64px  → blue house complete
+//  tree:       x=0, y=80,  32×80px  → tree sprite
+//  path_sand:  x=48,y=16,  48×16px  → sandy path tile (1 tile tall)
 // ═══════════════════════════════════════════════════
-
-// Building sprite definitions – pixel coords in outside tileset
-// sx,sy = source pixel, sw,sh = source size in pixels
-// Scale factor: SCALE=3 → each source pixel → 3 screen pixels
 const BLD_SPRITES = {
-  red_small: {sx:0, sy:176, sw:80, sh:80},
-  red_large: {sx:0, sy:256, sw:80, sh:96},
-  blue:      {sx:0, sy:352, sw:80, sh:80},
+  red_small: {sx:0,  sy:176, sw:80, sh:48},
+  red_large: {sx:0,  sy:256, sw:80, sh:64},
+  blue:      {sx:0,  sy:352, sw:80, sh:64},
 };
+// Path tile: the sandy tile from the tileset
+const PATH_TILE = {sx:48, sy:16, sw:16, sh:16};
 
 // Building definitions
 const BUILDINGS = [
@@ -1266,58 +1265,76 @@ function render(){
 // ═══════════════════════════════════════════════════
 function drawGrass(cw, ch){
   // Base green fill
-  const g = ctx.createLinearGradient(0,0,cw,ch);
-  g.addColorStop(0,'#7abf6a');
-  g.addColorStop(0.5,'#6aaf5a');
-  g.addColorStop(1,'#5a9f4a');
-  ctx.fillStyle=g;
+  ctx.fillStyle='#7abf6a';
   ctx.fillRect(0,0,cw,ch);
 
-  // Tile grass.png across visible area
+  // Tile grass.png at SCALE size across visible area
   if(imgs.grass && imgs.grass.complete && imgs.grass.naturalWidth>0){
-    const startX = Math.floor(-camX / TILE) * TILE;
-    const startY = Math.floor(-camY / TILE) * TILE;
-    const endX   = startX + cw + TILE*2;
-    const endY   = startY + ch + TILE*2;
-    ctx.globalAlpha = 0.55; // semi-transparent over base color for nice blend
-    for(let gy=startY; gy<endY; gy+=TILE){
-      for(let gx=startX; gx<endX; gx+=TILE){
+    const gTile=TILE*SCALE; // 32px per tile on screen
+    const startX=Math.floor(-camX/gTile)*gTile;
+    const startY=Math.floor(-camY/gTile)*gTile;
+    ctx.imageSmoothingEnabled=false;
+    for(let gy=startY; gy<startY+ch+gTile*2; gy+=gTile){
+      for(let gx=startX; gx<startX+cw+gTile*2; gx+=gTile){
         const sx=gx+camX, sy=gy+camY;
-        if(sx>-TILE&&sx<cw&&sy>-TILE&&sy<ch){
-          ctx.drawImage(imgs.grass, 0,0,TILE,TILE, sx,sy,TILE,TILE);
+        if(sx>-gTile&&sx<cw&&sy>-gTile&&sy<ch){
+          ctx.drawImage(imgs.grass,0,0,TILE,TILE,sx,sy,gTile,gTile);
         }
       }
     }
-    ctx.globalAlpha=1;
   }
 }
 
 // ═══════════════════════════════════════════════════
-//  ROADS  (organic sandy paths)
+//  ROADS  – rendered using sandy path tile from tileset
 // ═══════════════════════════════════════════════════
 function drawRoads(){
+  const cw=canvas.width, ch=canvas.height;
   ctx.save();
   ctx.lineCap='round';
   ctx.lineJoin='round';
-  ROADS.forEach((pts,ri)=>{
-    const baseW = ri===0 ? 62 : 44;
-    // Shadow
-    ctx.strokeStyle='rgba(100,70,20,0.18)';
-    ctx.lineWidth=baseW+10;
-    smoothPath(pts); ctx.stroke();
-    // Sandy base
-    ctx.strokeStyle='#d4b87a';
-    ctx.lineWidth=baseW;
-    smoothPath(pts); ctx.stroke();
-    // Mid
-    ctx.strokeStyle='#c4a860';
-    ctx.lineWidth=baseW-10;
-    smoothPath(pts); ctx.stroke();
-    // Highlight stripe
-    ctx.strokeStyle='rgba(230,200,140,0.45)';
-    ctx.lineWidth=10;
-    smoothPath(pts); ctx.stroke();
-  });
+
+  // First pass: draw wide base using canvas pattern from path tile
+  if(imgs.outside && imgs.outside.complete && imgs.outside.naturalWidth>0){
+    // Create an offscreen canvas with the path tile tiled
+    const tileSize=PATH_TILE.sw*SCALE; // 16*2=32px on screen
+    const offscreen=document.createElement('canvas');
+    offscreen.width=tileSize; offscreen.height=tileSize;
+    const octx=offscreen.getContext('2d');
+    octx.imageSmoothingEnabled=false;
+    octx.drawImage(imgs.outside, PATH_TILE.sx,PATH_TILE.sy,PATH_TILE.sw,PATH_TILE.sh, 0,0,tileSize,tileSize);
+    const pattern=ctx.createPattern(offscreen,'repeat');
+
+    ROADS.forEach((pts,ri)=>{
+      const baseW=ri===0?56:40;
+      // Shadow
+      ctx.strokeStyle='rgba(80,55,15,0.2)';
+      ctx.lineWidth=baseW+8;
+      smoothPath(pts); ctx.stroke();
+      // Tiled sand path
+      ctx.strokeStyle=pattern;
+      ctx.lineWidth=baseW;
+      smoothPath(pts); ctx.stroke();
+      // Soft edge highlight
+      ctx.strokeStyle='rgba(240,220,170,0.3)';
+      ctx.lineWidth=8;
+      smoothPath(pts); ctx.stroke();
+    });
+  } else {
+    // Fallback solid color roads
+    ROADS.forEach((pts,ri)=>{
+      const baseW=ri===0?56:40;
+      ctx.strokeStyle='rgba(100,70,20,0.18)';
+      ctx.lineWidth=baseW+8;
+      smoothPath(pts); ctx.stroke();
+      ctx.strokeStyle='#d4b87a';
+      ctx.lineWidth=baseW;
+      smoothPath(pts); ctx.stroke();
+      ctx.strokeStyle='rgba(230,200,140,0.4)';
+      ctx.lineWidth=10;
+      smoothPath(pts); ctx.stroke();
+    });
+  }
   ctx.restore();
 }
 
