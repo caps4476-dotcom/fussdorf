@@ -1076,21 +1076,22 @@ const WALK_ROWS = { down:0, left:1, right:2, up:3 };
 const WALK_FRAMES = 6;
 
 // ═══════════════════════════════════════════════════
-//  OUTSIDE TILESET – exakte Pixel-Koordinaten
-//  Analysiert aus 128×432px Tileset:
-//  red_small:  y=160, h=64  → kleines rotes Haus (Dach+Wand)
-//  red_large:  y=224, h=64  → großes rotes Haus (Dach+Wand)
-//  blue_small: y=304, h=48  → kleines blaues Haus
-//  blue_large: y=368, h=48  → großes blaues Haus
-//  Alle 80px breit (5 Tiles à 16px)
+//  OUTSIDE TILESET – finale exakte Koordinaten
+//  Alle Häuser: 64px breit (4 Tiles), kein Seiten-Streifen
+//  rot_klein:  x=0,y=160, 64×64px
+//  rot_gross:  x=0,y=224, 64×64px
+//  blau_klein: x=0,y=304, 64×48px
+//  blau_gross: x=0,y=368, 64×48px
+//  baum:       x=0,y=80,  32×48px (3 Tiles hoch)
 // ═══════════════════════════════════════════════════
 const BLD_SPRITES = {
-  red_small:  {sx:0, sy:160, sw:80, sh:64},
-  red_large:  {sx:0, sy:224, sw:80, sh:64},
-  blue_small: {sx:0, sy:304, sw:80, sh:48},
-  blue_large: {sx:0, sy:368, sw:80, sh:48},
+  red_small:  {sx:0, sy:160, sw:64, sh:64},
+  red_large:  {sx:0, sy:224, sw:64, sh:64},
+  blue_small: {sx:0, sy:304, sw:64, sh:48},
+  blue_large: {sx:0, sy:368, sw:64, sh:48},
 };
-// Path tile: sandy tile aus dem Tileset (x=48,y=0, 16×16px)
+const TREE_SPRITE = {sx:0, sy:80, sw:32, sh:48};
+// Sandy path tile
 const PATH_TILE = {sx:48, sy:0, sw:16, sh:16};
 
 // Building definitions
@@ -1454,31 +1455,30 @@ function drawZones(){
 // ═══════════════════════════════════════════════════
 function drawTree(t){
   const{x:sx,y:sy}=ws(t.x,t.y);
-  if(sx<-100||sx>canvas.width+100||sy<-100||sy>canvas.height+100)return;
+  if(sx<-120||sx>canvas.width+120||sy<-120||sy>canvas.height+120)return;
 
-  // Ground shadow
-  ctx.fillStyle='rgba(0,0,0,0.16)';
+  // Schatten
+  ctx.fillStyle='rgba(0,0,0,0.18)';
   ctx.beginPath();
-  ctx.ellipse(sx+2, sy+5, 20, 7, 0, 0, Math.PI*2);
+  ctx.ellipse(sx+2,sy+4,18,6,0,0,Math.PI*2);
   ctx.fill();
 
   if(imgs.outside && imgs.outside.complete && imgs.outside.naturalWidth>0){
     ctx.imageSmoothingEnabled=false;
-    // Tree is at x=0,y=80, size=32×80px in tileset
-    const treeSrcX=0, treeSrcY=80, treeSrcW=32, treeSrcH=80;
-    const drawScale = 0.75 + (t.variant * 0.12);
-    const dw = treeSrcW * SCALE * drawScale;
-    const dh = treeSrcH * SCALE * drawScale;
-    if(t.variant===2){
-      ctx.save();
-      ctx.scale(-1,1);
-      ctx.drawImage(imgs.outside, treeSrcX,treeSrcY,treeSrcW,treeSrcH, -sx-dw/2, sy-dh, dw, dh);
-      ctx.restore();
-    } else {
-      ctx.drawImage(imgs.outside, treeSrcX,treeSrcY,treeSrcW,treeSrcH, sx-dw/2, sy-dh, dw, dh);
-    }
+    // Baum: 32×48px im Tileset → auf Bildschirm skalieren
+    // Variante: leicht unterschiedliche Größen für Abwechslung
+    const scales=[1.8, 2.0, 1.6];
+    const sc=scales[t.variant%scales.length];
+    const dw=TREE_SPRITE.sw*SCALE*sc;
+    const dh=TREE_SPRITE.sh*SCALE*sc;
+    ctx.drawImage(
+      imgs.outside,
+      TREE_SPRITE.sx, TREE_SPRITE.sy, TREE_SPRITE.sw, TREE_SPRITE.sh,
+      Math.round(sx-dw/2), Math.round(sy-dh),
+      Math.round(dw), Math.round(dh)
+    );
   } else {
-    drawBlobTree(sx, sy);
+    drawBlobTree(sx,sy);
   }
 }
 
