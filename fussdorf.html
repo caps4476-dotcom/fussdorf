@@ -1511,8 +1511,10 @@ function drawBuilding(b){
   const spr=BLD[b.spr]||BLD.rot_klein;
   const dw=spr.sw*SCALE, dh=spr.sh*SCALE;
   if(sx+dw<0||sx-dw>canvas.width||sy+20<0||sy-dh-20>canvas.height)return;
+  // Schatten
   ctx.fillStyle='rgba(0,0,0,0.18)';
   ctx.beginPath();ctx.ellipse(sx,sy+6,dw*0.42,10,0,0,Math.PI*2);ctx.fill();
+  // Sprite
   if(imgs.outside&&imgs.outside.complete){
     ctx.imageSmoothingEnabled=false;
     ctx.drawImage(imgs.outside,spr.sx,spr.sy,spr.sw,spr.sh,Math.round(sx-dw/2),Math.round(sy-dh),dw,dh);
@@ -1520,17 +1522,26 @@ function drawBuilding(b){
     ctx.fillStyle='#e8d898';ctx.fillRect(sx-dw/2,sy-dh,dw,dh);
     ctx.fillStyle='#c04040';ctx.fillRect(sx-dw/2,sy-dh,dw,dh*0.4);
   }
+  // Hover-Glühen
   if(hoverObj===b){
     ctx.strokeStyle='rgba(240,192,64,0.85)';ctx.lineWidth=3;
     ctx.shadowColor='#f0c040';ctx.shadowBlur=16;
     ctx.beginPath();ctx.ellipse(sx,sy+4,dw*0.44,12,0,0,Math.PI*2);ctx.stroke();
     ctx.shadowBlur=0;
-    ctx.font="bold 13px 'Cinzel',serif";ctx.textAlign='center';
-    const lw=ctx.measureText(b.label).width+20;
-    ctx.fillStyle='rgba(20,10,3,0.9)';
-    ctx.beginPath();ctx.roundRect(sx-lw/2,sy-dh-32,lw,24,7);ctx.fill();
-    ctx.fillStyle='#f0c040';ctx.fillText(b.label,sx,sy-dh-13);
   }
+  // Gebäude-Label IMMER anzeigen (kleines Schild unter dem Dach)
+  ctx.font="bold 11px 'Cinzel',serif";ctx.textAlign='center';
+  const lbl=`${b.icon} ${b.label}`;
+  const lw=ctx.measureText(lbl).width+14;
+  const lx=sx, ly=sy-8;
+  // Hintergrund des Schildes
+  ctx.fillStyle='rgba(44,24,16,0.82)';
+  ctx.beginPath();ctx.roundRect(lx-lw/2,ly-17,lw,18,4);ctx.fill();
+  ctx.strokeStyle=hoverObj===b?'#f0c040':'rgba(201,149,42,0.6)';
+  ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.roundRect(lx-lw/2,ly-17,lw,18,4);ctx.stroke();
+  ctx.fillStyle=hoverObj===b?'#f0c040':'#e8d5a3';
+  ctx.fillText(lbl,lx,ly-3);
 }
 
 // ═══════════════════════════════════════════
@@ -1736,14 +1747,102 @@ const LOC={
   mill:    {ico:'⚙️',title:'Die Mühle',desc:'Das Rad dreht sich unaufhörlich.',
     act:[{l:'⚙️ Mahlen (8🌾→4💰)',f:()=>{trade('food',8,'gold',4);}},
          {l:'🔧 Mithelfen (+4XP)',f:()=>{gXP(4);notify('+4 XP');closePanel();}}]},
-  scheune: {ico:'🏚️',title:'Scheune',desc:'Heu und Vorräte.',
-    act:[{l:'📦 Einlagern (+6 XP)',f:()=>{gXP(6);notify('+6 XP 📦');closePanel();}}]},
+  scheune: {ico:'🏚️',title:'Scheune – Dein Lager',desc:'Hier lagerst du deine gesammelten Waren sicher ein.',
+    act:[
+      {l:'🪵 Holz einlagern',f:()=>{lagerEinlagern('wood','🪵 Holz');}},
+      {l:'🪨 Stein einlagern',f:()=>{lagerEinlagern('stone','🪨 Stein');}},
+      {l:'🌾 Getreide einlagern',f:()=>{lagerEinlagern('food','🌾 Getreide');}},
+      {l:'📊 Lager ansehen',f:()=>{zeigeScheunePanel();}},
+    ]},
   brunnen: {ico:'💧',title:'Der Brunnen',desc:'Frisches Wasser für das Dorf.',
     act:[{l:'💧 Wasser holen (+5 XP)',f:()=>{gXP(5);notify('+5 XP 💧');closePanel();}}]},
 };
 function clickBld(b){
   const loc=LOC[b.key];if(!loc)return;
-  walkTo(b.x,b.y-20,()=>{openPanel(b.icon,loc.title,loc.desc,loc.act);bubble(px,py,'Ich bin da!');});
+  walkTo(b.x,b.y-20,()=>{
+    if(b.key==='scheune') zeigeScheunePanel();
+    else openPanel(b.icon,loc.title,loc.desc,loc.act);
+    bubble(px,py,'Ich bin da!');
+  });
+}
+
+// ── LAGER-SYSTEM ──
+function getLager(){return player?.lager||{wood:0,stone:0,food:0};}
+function saveLager(l){if(!player)return;player.lager=l;saveP();}
+
+function lagerEinlagern(res,name){
+  const menge=getR(res);
+  if(menge<=0){notify(`Keine ${name} vorhanden!`,'e');return;}
+  // Alle Vorräte der Ressource einlagern
+  const lager=getLager();
+  lager[res]=(lager[res]||0)+menge;
+  addR(res,-menge); // aus Inventar entfernen
+  saveLager(lager);
+  gXP(Math.max(2,Math.floor(menge*0.5))); // XP nur wenn tatsächlich eingelagert
+  notify(`+${menge} ${name} eingelagert! +${Math.max(2,Math.floor(menge*0.5))} XP`);
+  zeigeScheunePanel(); // Panel aktualisieren
+}
+
+function lagerEntnehmen(res,name){
+  const lager=getLager();
+  const menge=lager[res]||0;
+  if(menge<=0){notify(`Kein ${name} im Lager!`,'e');return;}
+  lager[res]=0;
+  addR(res,menge);
+  saveLager(lager);
+  notify(`${menge} ${name} entnommen!`);
+  zeigeScheunePanel();
+}
+
+function zeigeScheunePanel(){
+  const lager=getLager();
+  document.getElementById('apico').textContent='🏚️';
+  document.getElementById('aptitle').textContent='Scheune – Lagerbestand';
+  // Lager-Tabelle als HTML in desc
+  const holz=lager.wood||0, stein=lager.stone||0, getreide=lager.food||0;
+  document.getElementById('apdesc').innerHTML=
+    `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:8px 0;">
+      <div style="background:rgba(255,255,255,0.08);border-radius:6px;padding:8px;text-align:center;">
+        <div style="font-size:1.4rem">🪵</div>
+        <div style="font-family:'Cinzel',serif;font-size:0.85rem;color:#f0c040;font-weight:700">${holz}</div>
+        <div style="font-size:0.65rem;color:#f4e4c1;opacity:0.7">Holz</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.08);border-radius:6px;padding:8px;text-align:center;">
+        <div style="font-size:1.4rem">🪨</div>
+        <div style="font-family:'Cinzel',serif;font-size:0.85rem;color:#f0c040;font-weight:700">${stein}</div>
+        <div style="font-size:0.65rem;color:#f4e4c1;opacity:0.7">Stein</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.08);border-radius:6px;padding:8px;text-align:center;">
+        <div style="font-size:1.4rem">🌾</div>
+        <div style="font-family:'Cinzel',serif;font-size:0.85rem;color:#f0c040;font-weight:700">${getreide}</div>
+        <div style="font-size:0.65rem;color:#f4e4c1;opacity:0.7">Getreide</div>
+      </div>
+    </div>
+    <div style="font-size:0.75rem;color:#f4e4c1;opacity:0.7;font-style:italic">Dein Inventar: 🪵${getR('wood')} 🪨${getR('stone')} 🌾${getR('food')}</div>`;
+  const btns=document.getElementById('apbtns');btns.innerHTML='';
+  // Einlagern-Buttons (nur aktiv wenn Inventar > 0)
+  [['wood','🪵 Holz einlagern',getR('wood')>0],
+   ['stone','🪨 Stein einlagern',getR('stone')>0],
+   ['food','🌾 Getreide einlagern',getR('food')>0]].forEach(([res,lbl,canDo])=>{
+    const btn=document.createElement('button');
+    btn.className='abt';btn.textContent=lbl;
+    if(!canDo){btn.style.opacity='0.4';btn.style.cursor='not-allowed';}
+    else btn.onclick=()=>lagerEinlagern(res,lbl.slice(3));
+    btns.appendChild(btn);
+  });
+  // Entnehmen-Buttons (nur aktiv wenn Lager > 0)
+  [['wood','🪵 Holz entnehmen',holz>0],
+   ['stone','🪨 Stein entnehmen',stein>0],
+   ['food','🌾 Getreide entnehmen',getreide>0]].forEach(([res,lbl,canDo])=>{
+    const btn=document.createElement('button');
+    btn.className='abt s';btn.textContent=lbl;
+    if(!canDo){btn.style.opacity='0.3';btn.style.cursor='not-allowed';}
+    else btn.onclick=()=>lagerEntnehmen(res,lbl.slice(3));
+    btns.appendChild(btn);
+  });
+  const cl=document.createElement('button');cl.className='abt s';cl.textContent='✕ Schließen';cl.onclick=closePanel;btns.appendChild(cl);
+  document.getElementById('approg').style.display='none';
+  document.getElementById('ap').classList.add('open');
 }
 function clickZone(z){
   const acts={
@@ -1793,8 +1892,10 @@ function startWork(zone,res,amt,secs){
 }
 function cancelWork(){clearInterval(wTimer2);workT=null;closePanel();}
 function trade(fr,fa,to,ta){
-  if(getR(fr)<fa){notify('Nicht genug!','e');return;}
-  addR(fr,-fa);addR(to,ta);notify(`-${fa} +${ta} ✓`);gXP(4);closePanel();
+  if(getR(fr)<fa){notify(`Nicht genug! (Brauchst ${fa})`,'e');return;}
+  addR(fr,-fa);addR(to,ta);
+  gXP(4); // XP nur wenn Handel erfolgreich
+  notify(`-${fa} → +${ta} ✓`);closePanel();
 }
 
 // ═══════════════════════════════════════════
