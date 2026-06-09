@@ -1076,31 +1076,32 @@ const WALK_ROWS = { down:0, left:1, right:2, up:3 };
 const WALK_FRAMES = 6;
 
 // ═══════════════════════════════════════════════════
-//  OUTSIDE TILESET layout (128×432 px)
-//  Exact pixel coordinates per building type:
-//  red_small:  x=0, y=176, 80×48px  → clean roof+wall, no double roof
-//  red_large:  x=0, y=256, 80×64px  → large red house complete
-//  blue:       x=0, y=352, 80×64px  → blue house complete
-//  tree:       x=0, y=80,  32×80px  → tree sprite
-//  path_sand:  x=48,y=16,  48×16px  → sandy path tile (1 tile tall)
+//  OUTSIDE TILESET – exakte Pixel-Koordinaten
+//  Analysiert aus 128×432px Tileset:
+//  red_small:  y=160, h=64  → kleines rotes Haus (Dach+Wand)
+//  red_large:  y=224, h=64  → großes rotes Haus (Dach+Wand)
+//  blue_small: y=304, h=48  → kleines blaues Haus
+//  blue_large: y=368, h=48  → großes blaues Haus
+//  Alle 80px breit (5 Tiles à 16px)
 // ═══════════════════════════════════════════════════
 const BLD_SPRITES = {
-  red_small: {sx:0,  sy:176, sw:80, sh:48},
-  red_large: {sx:0,  sy:256, sw:80, sh:64},
-  blue:      {sx:0,  sy:352, sw:80, sh:64},
+  red_small:  {sx:0, sy:160, sw:80, sh:64},
+  red_large:  {sx:0, sy:224, sw:80, sh:64},
+  blue_small: {sx:0, sy:304, sw:80, sh:48},
+  blue_large: {sx:0, sy:368, sw:80, sh:48},
 };
-// Path tile: the sandy tile from the tileset
-const PATH_TILE = {sx:48, sy:16, sw:16, sh:16};
+// Path tile: sandy tile aus dem Tileset (x=48,y=0, 16×16px)
+const PATH_TILE = {sx:48, sy:0, sw:16, sh:16};
 
 // Building definitions
 const BUILDINGS = [
-  {id:'myhouse',  x:1080, y:680,  key:'myhouse',  label:'Mein Haus',   spr:'red_small', icon:'🏠'},
-  {id:'taverne',  x:780,  y:1080, key:'taverne',  label:'Taverne',     spr:'red_large', icon:'🍺'},
-  {id:'schmiede', x:1180, y:1050, key:'schmiede', label:'Schmiede',    spr:'blue',      icon:'⚒️'},
-  {id:'markt',    x:1000, y:950,  key:'markt',    label:'Marktplatz',  spr:'red_large', icon:'🛒'},
-  {id:'kirche',   x:1280, y:580,  key:'kirche',   label:'Kirche',      spr:'blue',      icon:'⛪'},
-  {id:'muehle',   x:1400, y:820,  key:'mill',     label:'Mühle',       spr:'red_small', icon:'⚙️'},
-  {id:'scheune',  x:1550, y:1100, key:'scheune',  label:'Scheune',     spr:'red_small', icon:'🏚️'},
+  {id:'myhouse',  x:1080, y:680,  key:'myhouse',  label:'Mein Haus',   spr:'red_small',  icon:'🏠'},
+  {id:'taverne',  x:780,  y:1080, key:'taverne',  label:'Taverne',     spr:'red_large',  icon:'🍺'},
+  {id:'schmiede', x:1180, y:1050, key:'schmiede', label:'Schmiede',    spr:'blue_large', icon:'⚒️'},
+  {id:'markt',    x:1000, y:950,  key:'markt',    label:'Marktplatz',  spr:'red_large',  icon:'🛒'},
+  {id:'kirche',   x:1280, y:580,  key:'kirche',   label:'Kirche',      spr:'blue_large', icon:'⛪'},
+  {id:'muehle',   x:1400, y:820,  key:'mill',     label:'Mühle',       spr:'red_small',  icon:'⚙️'},
+  {id:'scheune',  x:1550, y:1100, key:'scheune',  label:'Scheune',     spr:'blue_small', icon:'🏚️'},
 ];
 
 // Resource zones (drawn as environment tiles)
@@ -1286,55 +1287,76 @@ function drawGrass(cw, ch){
 }
 
 // ═══════════════════════════════════════════════════
-//  ROADS  – rendered using sandy path tile from tileset
+//  ROADS – glatter Sandweg mit Pixel-Art Textur
 // ═══════════════════════════════════════════════════
 function drawRoads(){
-  const cw=canvas.width, ch=canvas.height;
   ctx.save();
   ctx.lineCap='round';
   ctx.lineJoin='round';
 
-  // First pass: draw wide base using canvas pattern from path tile
-  if(imgs.outside && imgs.outside.complete && imgs.outside.naturalWidth>0){
-    // Create an offscreen canvas with the path tile tiled
-    const tileSize=PATH_TILE.sw*SCALE; // 16*2=32px on screen
-    const offscreen=document.createElement('canvas');
-    offscreen.width=tileSize; offscreen.height=tileSize;
-    const octx=offscreen.getContext('2d');
-    octx.imageSmoothingEnabled=false;
-    octx.drawImage(imgs.outside, PATH_TILE.sx,PATH_TILE.sy,PATH_TILE.sw,PATH_TILE.sh, 0,0,tileSize,tileSize);
-    const pattern=ctx.createPattern(offscreen,'repeat');
+  ROADS.forEach((pts,ri)=>{
+    const baseW=ri===0?56:40;
 
-    ROADS.forEach((pts,ri)=>{
-      const baseW=ri===0?56:40;
-      // Shadow
-      ctx.strokeStyle='rgba(80,55,15,0.2)';
-      ctx.lineWidth=baseW+8;
-      smoothPath(pts); ctx.stroke();
-      // Tiled sand path
-      ctx.strokeStyle=pattern;
-      ctx.lineWidth=baseW;
-      smoothPath(pts); ctx.stroke();
-      // Soft edge highlight
-      ctx.strokeStyle='rgba(240,220,170,0.3)';
-      ctx.lineWidth=8;
-      smoothPath(pts); ctx.stroke();
-    });
-  } else {
-    // Fallback solid color roads
-    ROADS.forEach((pts,ri)=>{
-      const baseW=ri===0?56:40;
-      ctx.strokeStyle='rgba(100,70,20,0.18)';
-      ctx.lineWidth=baseW+8;
-      smoothPath(pts); ctx.stroke();
-      ctx.strokeStyle='#d4b87a';
-      ctx.lineWidth=baseW;
-      smoothPath(pts); ctx.stroke();
-      ctx.strokeStyle='rgba(230,200,140,0.4)';
-      ctx.lineWidth=10;
-      smoothPath(pts); ctx.stroke();
-    });
-  }
+    // 1. Äußerer Schatten
+    ctx.strokeStyle='rgba(80,55,15,0.22)';
+    ctx.lineWidth=baseW+10;
+    smoothPath(pts); ctx.stroke();
+
+    // 2. Sandige Basis (glatte Farbe)
+    ctx.strokeStyle='#d4c090';
+    ctx.lineWidth=baseW;
+    smoothPath(pts); ctx.stroke();
+
+    // 3. Mittlerer Ton
+    ctx.strokeStyle='#c8b078';
+    ctx.lineWidth=baseW-6;
+    smoothPath(pts); ctx.stroke();
+
+    // 4. Pixel-Art Textur drüber (aus Tileset) – als gestricheltes Muster
+    if(imgs.outside && imgs.outside.complete && imgs.outside.naturalWidth>0){
+      // Zeichne das Weg-Tile als dünne wiederholende Streifen
+      const tileW=PATH_TILE.sw*SCALE;
+      const tileH=PATH_TILE.sh*SCALE;
+      // Clip auf den Weg
+      ctx.save();
+      ctx.lineWidth=baseW-8;
+      ctx.strokeStyle='rgba(0,0,0,0)';
+      smoothPath(pts);
+      ctx.stroke();
+      // Zeichne Punkte entlang des Weges als Textur-Stamps
+      const totalPts=pts.length;
+      for(let i=0;i<totalPts-1;i++){
+        const p=pts[i], pn=pts[i+1];
+        const segs=Math.max(3,Math.round(Math.hypot(pn.x-p.x,pn.y-p.y)/12));
+        for(let s=0;s<segs;s++){
+          const t=s/segs;
+          const wx=p.x+(pn.x-p.x)*t;
+          const wy=p.y+(pn.y-p.y)*t;
+          const{x:sx,y:sy}=ws(wx,wy);
+          ctx.globalAlpha=0.25;
+          ctx.drawImage(
+            imgs.outside,
+            PATH_TILE.sx,PATH_TILE.sy,PATH_TILE.sw,PATH_TILE.sh,
+            sx-tileW/2, sy-tileH/2, tileW, tileH
+          );
+        }
+      }
+      ctx.globalAlpha=1;
+      ctx.restore();
+    }
+
+    // 5. Helle Mittellinie (Highlight)
+    ctx.strokeStyle='rgba(240,225,185,0.35)';
+    ctx.lineWidth=8;
+    smoothPath(pts); ctx.stroke();
+
+    // 6. Dunkle Randlinie
+    ctx.strokeStyle='rgba(140,100,40,0.18)';
+    ctx.lineWidth=baseW+2;
+    ctx.setLineDash([]);
+    smoothPath(pts); ctx.stroke();
+  });
+
   ctx.restore();
 }
 
