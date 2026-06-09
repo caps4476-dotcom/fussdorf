@@ -964,19 +964,17 @@ initIntro();
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{width:100%;height:100%;overflow:hidden;touch-action:none;}
-body{display:flex;flex-direction:column;font-family:'Crimson Text',serif;background:#6aad5a;}
+body{display:flex;flex-direction:column;font-family:'Crimson Text',serif;background:#5a9f4a;}
 .topbar{flex-shrink:0;height:48px;background:linear-gradient(90deg,#3a2010,#2c1810,#3a2010);border-bottom:3px solid #c9952a;display:flex;align-items:center;justify-content:space-between;padding:0 14px;gap:8px;z-index:300;}
-.tb-logo{font-family:'Cinzel',serif;font-size:.95rem;font-weight:700;color:#f0c040;text-shadow:0 1px 4px rgba(0,0,0,.5);}
+.tb-logo{font-family:'Cinzel',serif;font-size:.95rem;font-weight:700;color:#f0c040;}
 .tb-res{display:flex;gap:5px;}
 .tb-r{display:flex;align-items:center;gap:4px;background:rgba(0,0,0,.4);border:1px solid rgba(201,149,42,.4);border-radius:12px;padding:3px 10px;font-family:'Cinzel',serif;font-size:.7rem;color:#f4e4c1;font-weight:600;}
 .tb-player{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.28);border:1px solid rgba(201,149,42,.35);border-radius:14px;padding:3px 10px;}
 .tb-name{font-family:'Cinzel',serif;font-size:.7rem;color:#f4e4c1;}
 .tb-lv{background:#c9952a;color:#2c1810;border-radius:7px;padding:1px 6px;font-size:.62rem;font-family:'Cinzel',serif;font-weight:700;}
-.tb-btn{background:linear-gradient(135deg,#c9952a,#a07820);border:1px solid #f0c040;border-radius:6px;color:#2c1810;font-family:'Cinzel',serif;font-size:.68rem;font-weight:700;padding:5px 12px;cursor:pointer;transition:.15s;}
-.tb-btn:hover{filter:brightness(1.15);}
 .map-wrap{flex:1;position:relative;overflow:hidden;cursor:grab;user-select:none;}
 .map-wrap.drag{cursor:grabbing;}
-#c{position:absolute;top:0;left:0;display:block;image-rendering:pixelated;}
+#c{position:absolute;top:0;left:0;display:block;image-rendering:pixelated;image-rendering:crisp-edges;}
 #hint{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(20,10,3,.88);color:#f4e4c1;font-family:'Cinzel',serif;font-size:.66rem;padding:5px 14px;border-radius:12px;border:1px solid rgba(201,149,42,.4);pointer-events:none;z-index:80;animation:fadeO 5s 3s forwards;white-space:nowrap;}
 @keyframes fadeO{to{opacity:0;}}
 #ap{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(0deg,rgba(18,8,2,.98),rgba(18,8,2,.9));border-top:2px solid #c9952a;padding:10px 16px 14px;transform:translateY(100%);transition:transform .32s cubic-bezier(.34,1.4,.64,1);z-index:200;}
@@ -991,7 +989,7 @@ body{display:flex;flex-direction:column;font-family:'Crimson Text',serif;backgro
 .abt:hover{filter:brightness(1.1);transform:translateY(-1px);}
 .abt.s{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#f4e4c1;}
 .approg{height:7px;background:rgba(255,255,255,.12);border-radius:4px;overflow:hidden;margin-top:7px;display:none;}
-.apfill{height:100%;background:linear-gradient(90deg,#c9952a,#f0c040);border-radius:4px;width:0%;transition:width .1s linear;}
+.apfill{height:100%;background:linear-gradient(90deg,#c9952a,#f0c040);border-radius:4px;width:0%;}
 #na{position:absolute;top:56px;left:50%;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:5px;align-items:center;pointer-events:none;}
 .notif{background:linear-gradient(135deg,#3a2a10,#2c1810);border:2px solid #c9952a;border-radius:8px;padding:7px 16px;color:#f4e4c1;font-family:'Cinzel',serif;font-size:.73rem;box-shadow:0 4px 16px rgba(0,0,0,.5);animation:nfIn .25s ease;white-space:nowrap;}
 .notif.err{border-color:#c04040;}
@@ -1011,7 +1009,7 @@ body{display:flex;flex-direction:column;font-family:'Crimson Text',serif;backgro
 </div>
 <div class="map-wrap" id="mw">
   <canvas id="c"></canvas>
-  <div id="hint">🖱️ Ziehen zum Erkunden · Klick auf Gebäude · Charakter läuft hin</div>
+  <div id="hint">🖱️ Ziehen zum Erkunden · Klick auf Gebäude oder Ressource</div>
   <div id="na"></div>
 </div>
 <div id="ap">
@@ -1026,765 +1024,628 @@ body{display:flex;flex-direction:column;font-family:'Crimson Text',serif;backgro
   </div>
 </div>
 <script>
-// ═══════════════════════════════════════════════════
-//  ASSET URLS  – GitHub raw links
-// ═══════════════════════════════════════════════════
-const BASE = 'https://raw.githubusercontent.com/caps4476-dotcom/fussdorf/main/';
-const ASSETS = {
-  grass:   BASE + 'grass.png',
-  player:  BASE + 'player.png',
-  outside: BASE + 'Serene%20Village%20-%20Outside_blackpng.png',
-  plains:  BASE + 'plains.png',
-  water:   BASE + 'water-sheet.png',
-  objects: BASE + 'objects.png',
-  fences:  BASE + 'fences.png',
-  decor:   BASE + 'decor_16x16.png',
+// ═══════════════════════════════════════════
+//  ASSETS
+// ═══════════════════════════════════════════
+const BASE='https://raw.githubusercontent.com/caps4476-dotcom/fussdorf/main/';
+const ASSETS={
+  grass:   BASE+'grass.png',
+  player:  BASE+'player.png',
+  outside: BASE+'Serene%20Village%20-%20Outside_blackpng.png',
 };
-
-// ═══════════════════════════════════════════════════
-//  WORLD SIZE
-// ═══════════════════════════════════════════════════
-const W = 2400, H = 1800;
-const TILE = 16; // base tile size
-const SCALE = 2; // render scale (16px tiles → 32px on screen)
-const TS = TILE * SCALE; // 48px per tile on screen
-
-// ═══════════════════════════════════════════════════
-//  IMAGES
-// ═══════════════════════════════════════════════════
-const imgs = {};
-let loadedCount = 0, totalAssets = Object.keys(ASSETS).length;
-
-function loadAssets(cb) {
-  Object.entries(ASSETS).forEach(([key, url]) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => { loadedCount++; if(loadedCount >= totalAssets) cb(); };
-    img.onerror = () => { loadedCount++; if(loadedCount >= totalAssets) cb(); };
-    img.src = url;
-    imgs[key] = img;
+const imgs={};
+let loaded=0;
+function loadAssets(cb){
+  Object.entries(ASSETS).forEach(([k,url])=>{
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=()=>{loaded++;if(loaded>=Object.keys(ASSETS).length)cb();};
+    img.onerror=()=>{loaded++;if(loaded>=Object.keys(ASSETS).length)cb();};
+    img.src=url; imgs[k]=img;
   });
 }
 
-// ═══════════════════════════════════════════════════
-//  PLAYER SPRITE  (288×480, 6 cols × 10 rows = 48×48 each)
-// ═══════════════════════════════════════════════════
-const SPR_W = 48, SPR_H = 48;
-// Walk animation rows: 0=down, 1=left, 2=right, 3=up
-// Each row has 6 frames
-const WALK_ROWS = { down:0, left:1, right:2, up:3 };
-const WALK_FRAMES = 6;
+// ═══════════════════════════════════════════
+//  SPRITE DEFINITIONEN (exakt aus Tileset)
+// ═══════════════════════════════════════════
+const TILE=16, SCALE=2;
 
-// ═══════════════════════════════════════════════════
-//  OUTSIDE TILESET – finale exakte Koordinaten
-//  Alle Häuser: 64px breit (4 Tiles), kein Seiten-Streifen
-//  rot_klein:  x=0,y=160, 64×64px
-//  rot_gross:  x=0,y=224, 64×64px
-//  blau_klein: x=0,y=304, 64×48px
-//  blau_gross: x=0,y=368, 64×48px
-//  baum:       x=0,y=80,  32×48px (3 Tiles hoch)
-// ═══════════════════════════════════════════════════
-const BLD_SPRITES = {
-  red_small:  {sx:0, sy:160, sw:64, sh:64},
-  red_large:  {sx:0, sy:224, sw:64, sh:64},
-  blue_small: {sx:0, sy:304, sw:64, sh:48},
-  blue_large: {sx:0, sy:368, sw:64, sh:48},
+// Gebäude – 64px breit (4 Tiles), kein Seiten-Streifen
+const BLD={
+  rot_klein:  {sx:0,  sy:160, sw:64, sh:64},
+  rot_gross:  {sx:0,  sy:224, sw:64, sh:64},
+  blau_klein: {sx:0,  sy:304, sw:64, sh:48},
+  blau_gross: {sx:0,  sy:368, sw:64, sh:48},
 };
-const TREE_SPRITE = {sx:0, sy:80, sw:32, sh:48};
-// Sandy path tile
-const PATH_TILE = {sx:48, sy:0, sw:16, sh:16};
 
-// Building definitions
-const BUILDINGS = [
-  {id:'myhouse',  x:1080, y:680,  key:'myhouse',  label:'Mein Haus',   spr:'red_small',  icon:'🏠'},
-  {id:'taverne',  x:780,  y:1080, key:'taverne',  label:'Taverne',     spr:'red_large',  icon:'🍺'},
-  {id:'schmiede', x:1180, y:1050, key:'schmiede', label:'Schmiede',    spr:'blue_large', icon:'⚒️'},
-  {id:'markt',    x:1000, y:950,  key:'markt',    label:'Marktplatz',  spr:'red_large',  icon:'🛒'},
-  {id:'kirche',   x:1280, y:580,  key:'kirche',   label:'Kirche',      spr:'blue_large', icon:'⛪'},
-  {id:'muehle',   x:1400, y:820,  key:'mill',     label:'Mühle',       spr:'red_small',  icon:'⚙️'},
-  {id:'scheune',  x:1550, y:1100, key:'scheune',  label:'Scheune',     spr:'blue_small', icon:'🏚️'},
+// Ressourcen-Sprites aus Tileset
+const RES_SPR={
+  tree:        {sx:0,  sy:80,  sw:32, sh:48},  // Baum
+  bush_green:  {sx:16, sy:96,  sw:16, sh:16},  // grüner Busch
+  bush_teal:   {sx:32, sy:96,  sw:16, sh:16},  // türkiser Busch
+  sand:        {sx:32, sy:0,   sw:32, sh:32},  // Sand (Steinbruch)
+  water:       {sx:80, sy:0,   sw:48, sh:48},  // Wasser (Teich)
+  flower_wh:   {sx:0,  sy:64,  sw:16, sh:16},  // weiße Blume
+  flower_rd:   {sx:48, sy:80,  sw:16, sh:16},  // rote Blume
+  flower_tl:   {sx:64, sy:80,  sw:16, sh:16},  // blaue Blume
+  path:        {sx:32, sy:0,   sw:16, sh:16},  // Weg-Tile
+};
+
+// Player sprite: 288×480px, 6×10 Frames, je 48×48px
+const SPR_W=48, SPR_H=48;
+const WALK={down:0,left:1,right:2,up:3};
+
+// ═══════════════════════════════════════════
+//  WELT  (viel größer!)
+// ═══════════════════════════════════════════
+const W=4000, H=3200;
+
+// Gebäude
+const BUILDINGS=[
+  {id:'myhouse',  x:1600,y:1100,key:'myhouse', label:'Mein Haus',  spr:'rot_klein', icon:'🏠'},
+  {id:'taverne',  x:1200,y:1600,key:'taverne', label:'Taverne',    spr:'rot_gross', icon:'🍺'},
+  {id:'schmiede', x:1800,y:1500,key:'schmiede',label:'Schmiede',   spr:'blau_gross',icon:'⚒️'},
+  {id:'markt',    x:1500,y:1350,key:'markt',   label:'Marktplatz', spr:'rot_gross', icon:'🛒'},
+  {id:'kirche',   x:1900,y:1000,key:'kirche',  label:'Kirche',     spr:'blau_klein',icon:'⛪'},
+  {id:'muehle',   x:2100,y:1250,key:'mill',    label:'Mühle',      spr:'rot_klein', icon:'⚙️'},
+  {id:'scheune',  x:2300,y:1600,key:'scheune', label:'Scheune',    spr:'blau_klein',icon:'🏚️'},
+  {id:'brunnen',  x:1650,y:1300,key:'brunnen', label:'Brunnen',    spr:'rot_klein', icon:'💧'},
 ];
 
-// Resource zones (drawn as environment tiles)
-const ZONES = [
-  {id:'wald1',   x:380,  y:520,  key:'wald',   label:'Wald',         icon:'🌲', res:'wood',  r:80},
-  {id:'wald2',   x:580,  y:380,  key:'wald',   label:'Wald',         icon:'🌲', res:'wood',  r:65},
-  {id:'wald3',   x:260,  y:720,  key:'wald',   label:'Wald',         icon:'🌲', res:'wood',  r:60},
-  {id:'steinbr', x:1680, y:480,  key:'quarry', label:'Steinbruch',   icon:'⛏️', res:'stone', r:75},
-  {id:'lehm',    x:1820, y:720,  key:'lehm',   label:'Lehmgrube',    icon:'🏺', res:'stone', r:60},
-  {id:'feld1',   x:600,  y:1280, key:'field',  label:'Weizenfeld',   icon:'🌾', res:'food',  r:80},
-  {id:'feld2',   x:860,  y:1440, key:'field',  label:'Weizenfeld',   icon:'🌾', res:'food',  r:70},
-  {id:'teich',   x:420,  y:1050, key:'pond',   label:'Dorfteich',    icon:'🌊', res:null,    r:90},
+// Ressourcen-Zonen (weit verteilt)
+const ZONES=[
+  // Wälder – Nordwesten, viele Bäume
+  {id:'wald1',   x:480,  y:600,  key:'wald',  label:'Großer Wald',  icon:'🌲',res:'wood',  r:180},
+  {id:'wald2',   x:700,  y:400,  key:'wald',  label:'Birkenwald',   icon:'🌲',res:'wood',  r:140},
+  {id:'wald3',   x:300,  y:900,  key:'wald',  label:'Fichtenwald',  icon:'🌲',res:'wood',  r:150},
+  {id:'wald4',   x:600,  y:1100, key:'wald',  label:'Dickicht',     icon:'🌲',res:'wood',  r:120},
+  {id:'wald5',   x:900,  y:500,  key:'wald',  label:'Waldrand',     icon:'🌲',res:'wood',  r:130},
+  // Steinbruch – Osten, grau/steinig
+  {id:'steinbr', x:3000, y:700,  key:'quarry',label:'Steinbruch',   icon:'⛏️',res:'stone', r:160},
+  {id:'steinbr2',x:3300, y:1000, key:'quarry',label:'Felsbruch',    icon:'⛏️',res:'stone', r:140},
+  // Lehmgrube – Südosten, braun/nass
+  {id:'lehm1',   x:3100, y:2000, key:'lehm',  label:'Lehmgrube',    icon:'🏺',res:'stone', r:140},
+  {id:'lehm2',   x:2800, y:2300, key:'lehm',  label:'Tongrube',     icon:'🏺',res:'stone', r:120},
+  // Felder – Süden, warm/gelb
+  {id:'feld1',   x:900,  y:2500, key:'field', label:'Weizenfeld',   icon:'🌾',res:'food',  r:180},
+  {id:'feld2',   x:1200, y:2800, key:'field', label:'Gerstenfeld',  icon:'🌾',res:'food',  r:160},
+  {id:'feld3',   x:600,  y:2800, key:'field', label:'Roggenfeld',   icon:'🌾',res:'food',  r:140},
+  // Teich – Mitte/West
+  {id:'teich',   x:700,  y:1600, key:'pond',  label:'Dorfteich',    icon:'🌊',res:null,    r:160},
+  {id:'see',     x:3500, y:1500, key:'pond',  label:'Waldsee',      icon:'🌊',res:null,    r:200},
 ];
 
-// ═══════════════════════════════════════════════════
-//  ROAD NETWORK (organic bezier paths)
-// ═══════════════════════════════════════════════════
-const ROADS = [
-  [{x:500,y:1700},{x:580,y:1550},{x:650,y:1420},{x:700,y:1300},
-   {x:760,y:1180},{x:820,y:1080},{x:900,y:980},{x:980,y:900},
-   {x:1060,y:840},{x:1100,y:760},{x:1120,y:680},{x:1180,y:620},
-   {x:1250,y:580},{x:1320,y:560},{x:1400,y:560},{x:1500,y:580}],
-  [{x:900,y:980},{x:820,y:900},{x:720,y:800},{x:620,y:700},
-   {x:520,y:620},{x:440,y:560},{x:380,y:520}],
-  [{x:1180,y:620},{x:1300,y:540},{x:1420,y:500},{x:1540,y:480},
-   {x:1620,y:480},{x:1680,y:470}],
-  [{x:760,y:1180},{x:680,y:1260},{x:620,y:1340},{x:600,y:1420}],
-  [{x:700,y:1300},{x:580,y:1220},{x:480,y:1160},{x:430,y:1100}],
-  [{x:1100,y:760},{x:1200,y:790},{x:1320,y:810},{x:1400,y:825}],
-  [{x:1500,y:580},{x:1600,y:620},{x:1700,y:680},{x:1780,y:730}],
+// Wege
+const ROADS=[
+  [{x:800,y:3000},{x:850,y:2700},{x:900,y:2400},{x:1000,y:2100},
+   {x:1100,y:1900},{x:1200,y:1700},{x:1300,y:1550},{x:1450,y:1400},
+   {x:1580,y:1300},{x:1650,y:1200},{x:1700,y:1100},{x:1800,y:1020},
+   {x:1950,y:980}, {x:2100,y:1000},{x:2300,y:1050},{x:2500,y:1100}],
+  [{x:1450,y:1400},{x:1350,y:1300},{x:1200,y:1200},{x:1000,y:1100},
+   {x:800,y:1000},{x:650,y:900},{x:550,y:750},{x:480,y:620}],
+  [{x:1800,y:1020},{x:1900,y:950},{x:2050,y:900},{x:2200,y:880},
+   {x:2500,y:860},{x:2800,y:840},{x:3000,y:780}],
+  [{x:1300,y:1550},{x:1200,y:1580},{x:1100,y:1620},{x:900,y:1650},
+   {x:750,y:1650},{x:680,y:1700}],
+  [{x:1580,y:1300},{x:1700,y:1380},{x:1850,y:1430},{x:2000,y:1450},
+   {x:2200,y:1500},{x:2350,y:1600}],
+  [{x:2500,y:1100},{x:2700,y:1200},{x:2900,y:1350},{x:3000,y:1500},
+   {x:3050,y:1700},{x:3100,y:1900}],
+  [{x:1000,y:2100},{x:900,y:2200},{x:800,y:2400},{x:750,y:2600},
+   {x:700,y:2800}],
 ];
 
-// ═══════════════════════════════════════════════════
-//  GRASS TILE MAP  (coarse grid for variety)
-// ═══════════════════════════════════════════════════
-// We tile the 16×16 grass.png across the whole world
-// plains.png used for path-adjacent areas
+// ═══════════════════════════════════════════
+//  DEKORATIONEN (Seed-basiert)
+// ═══════════════════════════════════════════
+function seededRng(s){
+  let a=s;
+  return()=>{a=Math.imul(a^a>>>15,1|a);a^=a+Math.imul(a^a>>>7,61|a);return((a^a>>>14)>>>0)/4294967296;};
+}
 
-// ═══════════════════════════════════════════════════
-//  DECORATIVE TREES  (drawn with outside tileset tree tiles)
-// ═══════════════════════════════════════════════════
-function seededRng(s){let a=s;return()=>{a=Math.imul(a^a>>>15,1|a);a^=a+Math.imul(a^a>>>7,61|a);return((a^a>>>14)>>>0)/4294967296;};}
+function nearRoad(x,y,d){
+  for(const r of ROADS)for(let i=0;i<r.length-1;i++){
+    const p=r[i],q=r[i+1],dx=q.x-p.x,dy=q.y-p.y;
+    const t=Math.max(0,Math.min(1,((x-p.x)*dx+(y-p.y)*dy)/(dx*dx+dy*dy||1)));
+    if(Math.hypot(x-p.x-t*dx,y-p.y-t*dy)<d)return true;
+  }return false;
+}
+function nearBld(x,y,d){return BUILDINGS.some(b=>Math.hypot(x-b.x,y-b.y)<d);}
+function nearZone(x,y,d){return ZONES.some(z=>Math.hypot(x-z.x,y-z.y)<z.r+d);}
 
-const TREES = (()=>{
-  const r=seededRng(77), t=[];
-  for(let i=0;i<120;i++){
-    const x=80+r()*(W-160), y=80+r()*(H-160);
-    // avoid roads
-    let nearRoad=false;
-    for(const road of ROADS){
-      for(let j=0;j<road.length-1;j++){
-        const p=road[j],q=road[j+1];
-        const dx=q.x-p.x,dy=q.y-p.y;
-        const t2=Math.max(0,Math.min(1,((x-p.x)*dx+(y-p.y)*dy)/(dx*dx+dy*dy||1)));
-        if(Math.hypot(x-p.x-t2*dx,y-p.y-t2*dy)<90){nearRoad=true;break;}
-      }
-      if(nearRoad)break;
-    }
-    // avoid buildings
-    const nearBld = BUILDINGS.some(b=>Math.hypot(x-b.x,y-b.y)<130);
-    const nearZone = ZONES.some(z=>Math.hypot(x-z.x,y-z.y)<z.r+30);
-    if(!nearRoad && !nearBld && !nearZone){
-      t.push({x,y,variant:Math.floor(r()*3)});
-    }
+// Einzelne Bäume verteilt über die Karte
+const TREES=(()=>{
+  const rng=seededRng(42),t=[];
+  for(let i=0;i<300;i++){
+    const x=80+rng()*(W-160), y=80+rng()*(H-160);
+    if(nearRoad(x,y,80)||nearBld(x,y,150)||nearZone(x,y,20))continue;
+    t.push({x,y,variant:Math.floor(rng()*3),scale:0.8+rng()*0.5});
   }
   return t;
 })();
 
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
 //  STATE
-// ═══════════════════════════════════════════════════
-let player = null, others = [];
-let camX = 700, camY = 400;
-let px = 1080, py = 750;
-let pDir = 'down';
-let pWalk = false, pFrame = 0, pFrameTimer = 0;
-let wPath = [], wTimer = null, workT = null, wTimer2 = null;
-let hoverBld = null, animT = 0;
-let bubbles = [];
-let drag = {on:false,sx:0,sy:0,cx:0,cy:0,vx:0,vy:0,t:0};
-let didDrag = false;
-let assetsReady = false;
+// ═══════════════════════════════════════════
+let player=null, others=[];
+let camX=1100, camY=700;
+let px=1600, py=1200;
+let pDir='down', pWalk=false, pFrame=0, pFrameT=0;
+let wPath=[], wTimer=null, workT=null, wTimer2=null;
+let hoverObj=null, animT=0, bubbles=[], assetsReady=false;
+let drag={on:false,sx:0,sy:0,cx:0,cy:0,vx:0,vy:0,t:0};
+let didDrag=false;
 
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-ctx.imageSmoothingEnabled = false;
-const mw = document.getElementById('mw');
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+const mw=document.getElementById('mw');
 
-function resize(){
-  canvas.width  = mw.clientWidth;
-  canvas.height = mw.clientHeight;
-}
-window.addEventListener('resize', resize);
-resize();
+function resize(){canvas.width=mw.clientWidth;canvas.height=mw.clientHeight;}
+window.addEventListener('resize',resize);resize();
 
-// ═══════════════════════════════════════════════════
-//  COORDINATE HELPERS
-// ═══════════════════════════════════════════════════
-function ws(wx,wy){return{x:wx-camX, y:wy-camY};}
+function ws(wx,wy){return{x:Math.round(wx-camX),y:Math.round(wy-camY)};}
 
-// ═══════════════════════════════════════════════════
-//  MAIN LOOP
-// ═══════════════════════════════════════════════════
-function loop(){
-  animT++;
-  applyInertia();
-  updateOthers();
-  updateBubbles();
-  render();
-  requestAnimationFrame(loop);
-}
+// ═══════════════════════════════════════════
+//  HAUPTSCHLEIFE
+// ═══════════════════════════════════════════
+function loop(){animT++;applyInertia();updateOthers();updateBubbles();render();requestAnimationFrame(loop);}
 
-// ═══════════════════════════════════════════════════
-//  RENDER
-// ═══════════════════════════════════════════════════
 function render(){
-  const cw=canvas.width, ch=canvas.height;
+  const cw=canvas.width,ch=canvas.height;
   ctx.clearRect(0,0,cw,ch);
-
-  if(!assetsReady){
-    // Loading screen
-    ctx.fillStyle='#2a4a1a';
-    ctx.fillRect(0,0,cw,ch);
-    ctx.fillStyle='#f0c040';
-    ctx.font="bold 18px 'Cinzel',serif";
-    ctx.textAlign='center';
-    ctx.fillText('Karte wird geladen…', cw/2, ch/2);
-    ctx.fillStyle='rgba(240,192,64,0.3)';
-    const prog = loadedCount/totalAssets;
-    ctx.fillRect(cw/2-100, ch/2+20, 200*prog, 10);
-    ctx.strokeStyle='#c9952a';
-    ctx.strokeRect(cw/2-100, ch/2+20, 200, 10);
-    return;
-  }
-
-  drawGrass(cw, ch);
+  if(!assetsReady){drawLoading(cw,ch);return;}
+  drawGrass(cw,ch);
   drawRoads();
-  drawZones();
-
-  // Collect all y-sorted drawables
-  const allObjs = [
-    ...TREES.map(t=>({...t, _type:'tree'})),
-    ...BUILDINGS.map(b=>({...b, _type:'bld', y:b.y})),
-    ...others.map(o=>({...o, _type:'other'})),
-    {_type:'me', x:px, y:py},
-  ].sort((a,b)=>a.y-b.y);
-
-  allObjs.forEach(obj=>{
-    if(obj._type==='tree') drawTree(obj);
-    else if(obj._type==='bld') drawBuilding(obj);
-    else if(obj._type==='other') drawOtherPlayer(obj);
-    else if(obj._type==='me') drawPlayer();
+  // Ressourcen-Zonen (unter Bäumen/Gebäuden)
+  ZONES.forEach(z=>{
+    if(z.key==='pond')drawPond(z);
+    else if(z.key==='field')drawField(z);
+    else if(z.key==='quarry')drawQuarry(z);
+    else if(z.key==='lehm')drawLehm(z);
+    else if(z.key==='wald')drawWaldGround(z);
   });
-
+  // Y-sortiert
+  const all=[
+    ...TREES.map(t=>({...t,_t:'tree'})),
+    ...ZONES.filter(z=>z.key==='wald').map(z=>({...z,_t:'waldtrees'})),
+    ...BUILDINGS.map(b=>({...b,_t:'bld'})),
+    ...others.map(o=>({...o,_t:'other'})),
+    {_t:'me',x:px,y:py},
+  ].sort((a,b)=>a.y-b.y);
+  all.forEach(o=>{
+    if(o._t==='tree')drawTree(o);
+    else if(o._t==='waldtrees')drawWaldTrees(o);
+    else if(o._t==='bld')drawBuilding(o);
+    else if(o._t==='other')drawOther(o);
+    else if(o._t==='me')drawMe();
+  });
   drawBubbles();
-  if(workT) drawWorkFX();
+  if(workT)drawWorkFX();
   drawMinimap();
 }
 
-// ═══════════════════════════════════════════════════
-//  GRASS BACKGROUND  (tiled grass.png + color base)
-// ═══════════════════════════════════════════════════
-function drawGrass(cw, ch){
-  // Base green fill
-  ctx.fillStyle='#7abf6a';
-  ctx.fillRect(0,0,cw,ch);
+function drawLoading(cw,ch){
+  ctx.fillStyle='#2a4a1a';ctx.fillRect(0,0,cw,ch);
+  ctx.fillStyle='#f0c040';ctx.font="bold 18px 'Cinzel',serif";ctx.textAlign='center';
+  ctx.fillText('Karte wird geladen…',cw/2,ch/2);
+  ctx.fillStyle='rgba(240,192,64,0.3)';
+  ctx.fillRect(cw/2-100,ch/2+20,200*(loaded/Object.keys(ASSETS).length),10);
+  ctx.strokeStyle='#c9952a';ctx.strokeRect(cw/2-100,ch/2+20,200,10);
+}
 
-  // Tile grass.png at SCALE size across visible area
-  if(imgs.grass && imgs.grass.complete && imgs.grass.naturalWidth>0){
-    const gTile=TILE*SCALE; // 32px per tile on screen
-    const startX=Math.floor(-camX/gTile)*gTile;
-    const startY=Math.floor(-camY/gTile)*gTile;
+// ═══════════════════════════════════════════
+//  GRAS
+// ═══════════════════════════════════════════
+function drawGrass(cw,ch){
+  ctx.fillStyle='#6abf5a';ctx.fillRect(0,0,cw,ch);
+  if(imgs.grass&&imgs.grass.complete&&imgs.grass.naturalWidth>0){
+    const gs=TILE*SCALE;
+    const sx=Math.floor(-camX/gs)*gs, sy2=Math.floor(-camY/gs)*gs;
     ctx.imageSmoothingEnabled=false;
-    for(let gy=startY; gy<startY+ch+gTile*2; gy+=gTile){
-      for(let gx=startX; gx<startX+cw+gTile*2; gx+=gTile){
-        const sx=gx+camX, sy=gy+camY;
-        if(sx>-gTile&&sx<cw&&sy>-gTile&&sy<ch){
-          ctx.drawImage(imgs.grass,0,0,TILE,TILE,sx,sy,gTile,gTile);
-        }
+    for(let y=sy2;y<sy2+ch+gs*2;y+=gs)
+      for(let x=sx;x<sx+cw+gs*2;x+=gs){
+        const dx=x+camX,dy=y+camY;
+        if(dx>-gs&&dx<cw&&dy>-gs&&dy<ch)
+          ctx.drawImage(imgs.grass,0,0,TILE,TILE,dx,dy,gs,gs);
       }
-    }
   }
 }
 
-// ═══════════════════════════════════════════════════
-//  ROADS – glatter Sandweg mit Pixel-Art Textur
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
+//  WEGE
+// ═══════════════════════════════════════════
 function drawRoads(){
-  ctx.save();
-  ctx.lineCap='round';
-  ctx.lineJoin='round';
-
+  ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
   ROADS.forEach((pts,ri)=>{
-    const baseW=ri===0?56:40;
-
-    // 1. Äußerer Schatten
-    ctx.strokeStyle='rgba(80,55,15,0.22)';
-    ctx.lineWidth=baseW+10;
-    smoothPath(pts); ctx.stroke();
-
-    // 2. Sandige Basis (glatte Farbe)
-    ctx.strokeStyle='#d4c090';
-    ctx.lineWidth=baseW;
-    smoothPath(pts); ctx.stroke();
-
-    // 3. Mittlerer Ton
-    ctx.strokeStyle='#c8b078';
-    ctx.lineWidth=baseW-6;
-    smoothPath(pts); ctx.stroke();
-
-    // 4. Pixel-Art Textur drüber (aus Tileset) – als gestricheltes Muster
-    if(imgs.outside && imgs.outside.complete && imgs.outside.naturalWidth>0){
-      // Zeichne das Weg-Tile als dünne wiederholende Streifen
-      const tileW=PATH_TILE.sw*SCALE;
-      const tileH=PATH_TILE.sh*SCALE;
-      // Clip auf den Weg
-      ctx.save();
-      ctx.lineWidth=baseW-8;
-      ctx.strokeStyle='rgba(0,0,0,0)';
-      smoothPath(pts);
-      ctx.stroke();
-      // Zeichne Punkte entlang des Weges als Textur-Stamps
-      const totalPts=pts.length;
-      for(let i=0;i<totalPts-1;i++){
-        const p=pts[i], pn=pts[i+1];
-        const segs=Math.max(3,Math.round(Math.hypot(pn.x-p.x,pn.y-p.y)/12));
+    const bw=ri===0?64:46;
+    ctx.strokeStyle='rgba(80,55,15,0.2)';ctx.lineWidth=bw+10;smoothPath(pts);ctx.stroke();
+    ctx.strokeStyle='#d0b880';ctx.lineWidth=bw;smoothPath(pts);ctx.stroke();
+    ctx.strokeStyle='#c4a868';ctx.lineWidth=bw-8;smoothPath(pts);ctx.stroke();
+    // Pixel-Textur Overlay
+    if(imgs.outside&&imgs.outside.complete){
+      const tw=TILE*SCALE, th=TILE*SCALE;
+      for(let i=0;i<pts.length-1;i++){
+        const p=pts[i],q=pts[i+1];
+        const segs=Math.max(4,Math.round(Math.hypot(q.x-p.x,q.y-p.y)/14));
         for(let s=0;s<segs;s++){
-          const t=s/segs;
-          const wx=p.x+(pn.x-p.x)*t;
-          const wy=p.y+(pn.y-p.y)*t;
-          const{x:sx,y:sy}=ws(wx,wy);
-          ctx.globalAlpha=0.25;
-          ctx.drawImage(
-            imgs.outside,
-            PATH_TILE.sx,PATH_TILE.sy,PATH_TILE.sw,PATH_TILE.sh,
-            sx-tileW/2, sy-tileH/2, tileW, tileH
-          );
+          const t2=s/segs,wx=p.x+(q.x-p.x)*t2,wy=p.y+(q.y-p.y)*t2;
+          const{x,y}=ws(wx,wy);
+          ctx.globalAlpha=0.2;
+          ctx.drawImage(imgs.outside,RES_SPR.path.sx,RES_SPR.path.sy,RES_SPR.path.sw,RES_SPR.path.sh,x-tw/2,y-th/2,tw,th);
         }
-      }
-      ctx.globalAlpha=1;
-      ctx.restore();
+      }ctx.globalAlpha=1;
     }
-
-    // 5. Helle Mittellinie (Highlight)
-    ctx.strokeStyle='rgba(240,225,185,0.35)';
-    ctx.lineWidth=8;
-    smoothPath(pts); ctx.stroke();
-
-    // 6. Dunkle Randlinie
-    ctx.strokeStyle='rgba(140,100,40,0.18)';
-    ctx.lineWidth=baseW+2;
-    ctx.setLineDash([]);
-    smoothPath(pts); ctx.stroke();
-  });
-
-  ctx.restore();
+    ctx.strokeStyle='rgba(240,225,180,0.28)';ctx.lineWidth=10;smoothPath(pts);ctx.stroke();
+  });ctx.restore();
 }
-
 function smoothPath(pts){
   if(pts.length<2)return;
-  ctx.beginPath();
-  const{x:sx,y:sy}=ws(pts[0].x,pts[0].y);
-  ctx.moveTo(sx,sy);
+  const{x,y}=ws(pts[0].x,pts[0].y);ctx.beginPath();ctx.moveTo(x,y);
   for(let i=1;i<pts.length-1;i++){
-    const p=ws(pts[i].x,pts[i].y);
-    const pn=ws(pts[i+1].x,pts[i+1].y);
+    const p=ws(pts[i].x,pts[i].y),pn=ws(pts[i+1].x,pts[i+1].y);
     ctx.quadraticCurveTo(p.x,p.y,(p.x+pn.x)/2,(p.y+pn.y)/2);
   }
-  const pl=ws(pts[pts.length-1].x,pts[pts.length-1].y);
-  ctx.lineTo(pl.x,pl.y);
+  const pl=ws(pts[pts.length-1].x,pts[pts.length-1].y);ctx.lineTo(pl.x,pl.y);
 }
 
-// ═══════════════════════════════════════════════════
-//  RESOURCE ZONES
-// ═══════════════════════════════════════════════════
-function drawZones(){
-  ZONES.forEach(z=>{
-    const{x:sx,y:sy}=ws(z.x,z.y);
-    if(sx<-200||sx>canvas.width+200||sy<-200||sy>canvas.height+200)return;
+// ═══════════════════════════════════════════
+//  RESSOURCEN-ZONEN
+// ═══════════════════════════════════════════
 
-    if(z.key==='pond'){
-      // Water with animation
-      const pulse=0.85+Math.sin(animT*0.04)*0.15;
-      ctx.fillStyle=`rgba(60,130,200,${pulse*0.7})`;
-      ctx.beginPath();
-      ctx.ellipse(sx,sy,z.r*1.1,z.r*0.7,-0.2,0,Math.PI*2);
-      ctx.fill();
-      ctx.fillStyle=`rgba(120,200,255,${pulse*0.4})`;
-      ctx.beginPath();
-      ctx.ellipse(sx-z.r*0.2,sy-z.r*0.15,z.r*0.5,z.r*0.3,-0.2,0,Math.PI*2);
-      ctx.fill();
-      // Ripple
-      ctx.strokeStyle=`rgba(150,220,255,${0.3+Math.sin(animT*0.05)*0.2})`;
-      ctx.lineWidth=1.5;
-      ctx.beginPath();
-      ctx.ellipse(sx,sy,z.r*0.6,z.r*0.35,-0.2,0,Math.PI*2);
-      ctx.stroke();
-    } else if(z.key==='field'){
-      // Wheat field
-      ctx.fillStyle='rgba(180,140,40,0.3)';
-      ctx.beginPath();
-      ctx.ellipse(sx,sy,z.r,z.r*0.65,0,0,Math.PI*2);
-      ctx.fill();
-      // Wheat stalks (pixelated style)
-      for(let i=0;i<20;i++){
-        const angle=i*(Math.PI*2/20);
-        const dist=20+Math.random()*z.r*0.6;
-        const wx2=sx+Math.cos(angle)*dist;
-        const wy2=sy+Math.sin(angle)*dist*0.65;
-        const sway=Math.sin(animT*0.03+i)*3;
-        ctx.strokeStyle='#b89020';
-        ctx.lineWidth=2;
-        ctx.beginPath();
-        ctx.moveTo(wx2,wy2+8);
-        ctx.quadraticCurveTo(wx2+sway,wy2-2,wx2+sway,wy2-12);
-        ctx.stroke();
-        ctx.fillStyle='#d4a820';
-        ctx.beginPath();
-        ctx.ellipse(wx2+sway,wy2-12,2.5,5,0.1,0,Math.PI*2);
-        ctx.fill();
-      }
-    } else {
-      // Forest / quarry
-      const col = z.key==='wald' ? 'rgba(30,80,20,0.25)' : 'rgba(100,90,80,0.25)';
-      ctx.fillStyle=col;
-      ctx.beginPath();
-      ctx.ellipse(sx,sy,z.r,z.r*0.7,0,0,Math.PI*2);
-      ctx.fill();
-    }
-
-    // Hover label
-    if(hoverBld===z){
-      ctx.font="bold 12px 'Cinzel',serif";
-      ctx.textAlign='center';
-      const lbl=z.label;
-      const lw=ctx.measureText(lbl).width+18;
-      ctx.fillStyle='rgba(20,10,3,0.88)';
-      ctx.beginPath();
-      ctx.roundRect(sx-lw/2,sy-z.r*0.7-28,lw,22,6);
-      ctx.fill();
-      ctx.fillStyle='#f0c040';
-      ctx.fillText(lbl,sx,sy-z.r*0.7-11);
-    }
-  });
+// TEICH – echtes Wasser-Tile gekachelt
+function drawPond(z){
+  const{x:sx,y:sy}=ws(z.x,z.y);
+  if(sx+z.r<0||sx-z.r>canvas.width||sy+z.r<0||sy-z.r>canvas.height)return;
+  // Wasser-Fläche aus Tileset gekachelt
+  const tw=TILE*SCALE*2, th=TILE*SCALE*2;
+  ctx.save();
+  ctx.beginPath();ctx.ellipse(sx,sy,z.r*1.05,z.r*0.7,-0.15,0,Math.PI*2);ctx.clip();
+  if(imgs.outside&&imgs.outside.complete){
+    ctx.imageSmoothingEnabled=false;
+    const ws2=RES_SPR.water;
+    // Kachle Wasser-Tile in der Ellipse
+    for(let dy=-z.r;dy<z.r;dy+=th)
+      for(let dx=-z.r*1.05;dx<z.r*1.05;dx+=tw)
+        ctx.drawImage(imgs.outside,ws2.sx,ws2.sy,ws2.sw,ws2.sh,sx+dx,sy+dy*0.7-0.15,tw,th);
+  }else{
+    ctx.fillStyle='#5ab0e8';ctx.fill();
+  }
+  ctx.restore();
+  // Rand
+  ctx.strokeStyle='rgba(60,100,160,0.5)';ctx.lineWidth=3;
+  ctx.beginPath();ctx.ellipse(sx,sy,z.r*1.05,z.r*0.7,-0.15,0,Math.PI*2);ctx.stroke();
+  // Wasser-Glitzer animiert
+  const g=0.3+Math.sin(animT*0.05)*0.2;
+  ctx.fillStyle=`rgba(180,230,255,${g})`;
+  ctx.beginPath();ctx.ellipse(sx-z.r*0.25,sy-z.r*0.15,z.r*0.25,z.r*0.1,0,0,Math.PI*2);ctx.fill();
+  hoverLabel(z,sx,sy-z.r*0.7);
 }
 
-// ═══════════════════════════════════════════════════
-//  TREES  (from outside tileset, row 3-4)
-//  Tree in tileset: ~cols 0-1, rows 3-5 (3×3 tiles = 48×48px)
-// ═══════════════════════════════════════════════════
+// WEIZENFELD – Blumen-Tiles für schönes Aussehen
+function drawField(z){
+  const{x:sx,y:sy}=ws(z.x,z.y);
+  if(sx+z.r<0||sx-z.r>canvas.width||sy+z.r<0||sy-z.r>canvas.height)return;
+  // Braune Erde als Basis
+  ctx.fillStyle='#b8902a';
+  ctx.beginPath();ctx.ellipse(sx,sy,z.r,z.r*0.7,0,0,Math.PI*2);ctx.fill();
+  // Helle Erde-Textur
+  ctx.fillStyle='#c8a040';
+  ctx.beginPath();ctx.ellipse(sx,sy,z.r*0.92,z.r*0.64,0,0,Math.PI*2);ctx.fill();
+  // Ackerfurchen
+  ctx.strokeStyle='rgba(100,70,10,0.35)';ctx.lineWidth=2;
+  for(let i=-4;i<=4;i++){
+    ctx.beginPath();ctx.moveTo(sx-z.r*0.9,sy+i*z.r*0.13);ctx.lineTo(sx+z.r*0.9,sy+i*z.r*0.13);ctx.stroke();
+  }
+  // Weizen-Halme aus Tileset (Blumen-Tile als Weizen)
+  if(imgs.outside&&imgs.outside.complete){
+    ctx.imageSmoothingEnabled=false;
+    const tw=TILE*SCALE, th=TILE*SCALE;
+    const rng=seededRng(z.x*100+z.y);
+    for(let i=0;i<30;i++){
+      const angle=rng()*Math.PI*2;
+      const dist=rng()*z.r*0.82;
+      const fx=sx+Math.cos(angle)*dist;
+      const fy=sy+Math.sin(angle)*dist*0.7;
+      // Abwechselnd weiße und rote Blume = Weizen
+      const spr=i%3===0?RES_SPR.flower_rd:(i%3===1?RES_SPR.flower_wh:RES_SPR.flower_tl);
+      // Leichtes Schwingen
+      const sway=Math.sin(animT*0.03+i*0.8)*2;
+      ctx.drawImage(imgs.outside,spr.sx,spr.sy,spr.sw,spr.sh,fx-tw/2+sway,fy-th,tw,th);
+    }
+  }
+  hoverLabel(z,sx,sy-z.r*0.72);
+}
+
+// STEINBRUCH – Sand-Tiles + Stein-Optik
+function drawQuarry(z){
+  const{x:sx,y:sy}=ws(z.x,z.y);
+  if(sx+z.r<0||sx-z.r>canvas.width||sy+z.r<0||sy-z.r>canvas.height)return;
+  // Grauer Stein-Untergrund
+  ctx.fillStyle='#9a9580';
+  ctx.beginPath();ctx.ellipse(sx,sy,z.r,z.r*0.65,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#b0aa94';
+  ctx.beginPath();ctx.ellipse(sx,sy,z.r*0.88,z.r*0.58,0,0,Math.PI*2);ctx.fill();
+  // Sand-Tiles aus Tileset als Textur
+  if(imgs.outside&&imgs.outside.complete){
+    ctx.imageSmoothingEnabled=false;
+    ctx.save();
+    ctx.beginPath();ctx.ellipse(sx,sy,z.r*0.85,z.r*0.56,0,0,Math.PI*2);ctx.clip();
+    const tw=TILE*SCALE*2, th=TILE*SCALE*2;
+    const sp=RES_SPR.sand;
+    for(let dy=-z.r;dy<z.r;dy+=th)
+      for(let dx=-z.r;dx<z.r;dx+=tw)
+        ctx.drawImage(imgs.outside,sp.sx,sp.sy,sp.sw,sp.sh,sx+dx,sy+dy*0.56,tw,th);
+    ctx.restore();
+  }
+  // Felsen drumherum
+  const rng=seededRng(z.x+z.y);
+  for(let i=0;i<12;i++){
+    const angle=i/12*Math.PI*2+rng()*0.4;
+    const dist=z.r*(0.5+rng()*0.4);
+    const rx=sx+Math.cos(angle)*dist,ry=sy+Math.sin(angle)*dist*0.65;
+    const rs=8+rng()*12;
+    ctx.fillStyle='#888070';ctx.beginPath();ctx.ellipse(rx,ry,rs,rs*0.65,angle,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#aaa090';ctx.beginPath();ctx.ellipse(rx-rs*0.2,ry-rs*0.15,rs*0.6,rs*0.4,angle,0,Math.PI*2);ctx.fill();
+  }
+  // Label mit Pickel-Icon
+  hoverLabel(z,sx,sy-z.r*0.67);
+}
+
+// LEHMGRUBE – braun/nass, anders als Steinbruch
+function drawLehm(z){
+  const{x:sx,y:sy}=ws(z.x,z.y);
+  if(sx+z.r<0||sx-z.r>canvas.width||sy+z.r<0||sy-z.r>canvas.height)return;
+  // Braun-nasse Erde
+  ctx.fillStyle='#7a5530';
+  ctx.beginPath();ctx.ellipse(sx,sy,z.r,z.r*0.65,0.1,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#9a7248';
+  ctx.beginPath();ctx.ellipse(sx,sy,z.r*0.88,z.r*0.57,0.1,0,Math.PI*2);ctx.fill();
+  // Nasse Stellen (glänzend)
+  const rng=seededRng(z.x*7+z.y*3);
+  for(let i=0;i<5;i++){
+    const angle=rng()*Math.PI*2,dist=rng()*z.r*0.6;
+    const wx=sx+Math.cos(angle)*dist,wy=sy+Math.sin(angle)*dist*0.65;
+    const shine=0.2+Math.sin(animT*0.04+i)*0.1;
+    ctx.fillStyle=`rgba(120,90,50,${shine+0.3})`;
+    ctx.beginPath();ctx.ellipse(wx,wy,12+rng()*10,6+rng()*6,rng(),0,Math.PI*2);ctx.fill();
+    // Glanz
+    ctx.fillStyle=`rgba(180,150,100,${shine*0.6})`;
+    ctx.beginPath();ctx.ellipse(wx-3,wy-2,5,3,rng(),0,Math.PI*2);ctx.fill();
+  }
+  // Töpfe (runde Formen)
+  for(let i=0;i<4;i++){
+    const angle=(i/4)*Math.PI*2+0.5;
+    const dist=z.r*0.5;
+    const px2=sx+Math.cos(angle)*dist,py2=sy+Math.sin(angle)*dist*0.65;
+    ctx.fillStyle='#c87030';ctx.beginPath();ctx.arc(px2,py2,10,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#a85020';ctx.beginPath();ctx.arc(px2,py2-4,8,Math.PI,0);ctx.fill();
+    ctx.fillStyle='#e09050';ctx.beginPath();ctx.ellipse(px2,py2-8,8,4,0,0,Math.PI*2);ctx.fill();
+  }
+  hoverLabel(z,sx,sy-z.r*0.67);
+}
+
+// WALD-BODEN (Untergrund der Waldzone)
+function drawWaldGround(z){
+  const{x:sx,y:sy}=ws(z.x,z.y);
+  if(sx+z.r+50<0||sx-z.r-50>canvas.width||sy+z.r+50<0||sy-z.r-50>canvas.height)return;
+  // Dunklerer Waldboden
+  ctx.fillStyle='rgba(30,80,20,0.35)';
+  ctx.beginPath();ctx.ellipse(sx,sy,z.r*1.1,z.r*0.85,0,0,Math.PI*2);ctx.fill();
+}
+
+// WALD-BÄUME (viele Bäume pro Zone, Y-sortiert eingebettet)
+function drawWaldTrees(z){
+  const{x:sx,y:sy}=ws(z.x,z.y);
+  if(sx+z.r+100<0||sx-z.r-100>canvas.width||sy+z.r+100<0||sy-z.r-100>canvas.height)return;
+  if(!imgs.outside||!imgs.outside.complete)return;
+  const rng=seededRng(z.x*17+z.y*13);
+  // 18-25 Bäume pro Wald-Zone
+  const count=18+Math.floor(rng()*8);
+  for(let i=0;i<count;i++){
+    const angle=rng()*Math.PI*2;
+    const dist=rng()*z.r*0.95;
+    const tx=z.x+Math.cos(angle)*dist;
+    const ty=z.y+Math.sin(angle)*dist*0.8;
+    const{x:tsx,y:tsy}=ws(tx,ty);
+    const sc=1.4+rng()*0.7;
+    const dw=RES_SPR.tree.sw*SCALE*sc;
+    const dh=RES_SPR.tree.sh*SCALE*sc;
+    ctx.fillStyle='rgba(0,0,0,0.15)';
+    ctx.beginPath();ctx.ellipse(tsx+2,tsy+4,dw*0.35,8,0,0,Math.PI*2);ctx.fill();
+    ctx.imageSmoothingEnabled=false;
+    ctx.drawImage(imgs.outside,RES_SPR.tree.sx,RES_SPR.tree.sy,RES_SPR.tree.sw,RES_SPR.tree.sh,
+      Math.round(tsx-dw/2),Math.round(tsy-dh),Math.round(dw),Math.round(dh));
+  }
+  // Büsche am Rand
+  for(let i=0;i<8;i++){
+    const angle=rng()*Math.PI*2;
+    const dist=z.r*0.85+rng()*20;
+    const bx=z.x+Math.cos(angle)*dist;
+    const by=z.y+Math.sin(angle)*dist*0.8;
+    const{x:bsx,y:bsy}=ws(bx,by);
+    const bsc=TILE*SCALE*1.2;
+    const spr=i%2===0?RES_SPR.bush_green:RES_SPR.bush_teal;
+    ctx.drawImage(imgs.outside,spr.sx,spr.sy,spr.sw,spr.sh,bsx-bsc/2,bsy-bsc,bsc,bsc);
+  }
+  hoverLabel(z,ws(z.x,z.y).x,ws(z.x,z.y).y-z.r*0.82);
+}
+
+// ═══════════════════════════════════════════
+//  EINZELNE BÄUME
+// ═══════════════════════════════════════════
 function drawTree(t){
   const{x:sx,y:sy}=ws(t.x,t.y);
   if(sx<-120||sx>canvas.width+120||sy<-120||sy>canvas.height+120)return;
-
-  // Schatten
-  ctx.fillStyle='rgba(0,0,0,0.18)';
-  ctx.beginPath();
-  ctx.ellipse(sx+2,sy+4,18,6,0,0,Math.PI*2);
-  ctx.fill();
-
-  if(imgs.outside && imgs.outside.complete && imgs.outside.naturalWidth>0){
+  ctx.fillStyle='rgba(0,0,0,0.15)';
+  ctx.beginPath();ctx.ellipse(sx+2,sy+4,16,5,0,0,Math.PI*2);ctx.fill();
+  if(imgs.outside&&imgs.outside.complete){
     ctx.imageSmoothingEnabled=false;
-    // Baum: 32×48px im Tileset → auf Bildschirm skalieren
-    // Variante: leicht unterschiedliche Größen für Abwechslung
-    const scales=[1.8, 2.0, 1.6];
-    const sc=scales[t.variant%scales.length];
-    const dw=TREE_SPRITE.sw*SCALE*sc;
-    const dh=TREE_SPRITE.sh*SCALE*sc;
-    ctx.drawImage(
-      imgs.outside,
-      TREE_SPRITE.sx, TREE_SPRITE.sy, TREE_SPRITE.sw, TREE_SPRITE.sh,
-      Math.round(sx-dw/2), Math.round(sy-dh),
-      Math.round(dw), Math.round(dh)
-    );
-  } else {
-    drawBlobTree(sx,sy);
+    const dw=RES_SPR.tree.sw*SCALE*t.scale;
+    const dh=RES_SPR.tree.sh*SCALE*t.scale;
+    ctx.drawImage(imgs.outside,RES_SPR.tree.sx,RES_SPR.tree.sy,RES_SPR.tree.sw,RES_SPR.tree.sh,
+      Math.round(sx-dw/2),Math.round(sy-dh),Math.round(dw),Math.round(dh));
+  }else{
+    ctx.fillStyle='#2a6a1a';ctx.beginPath();ctx.arc(sx,sy-24,18,0,Math.PI*2);ctx.fill();
   }
 }
 
-function drawBlobTree(sx,sy){
-  ctx.fillStyle='rgba(0,0,0,0.15)';
-  ctx.beginPath();ctx.ellipse(sx+2,sy+5,18,7,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#5a3a1a';
-  ctx.fillRect(sx-4,sy-8,8,12);
-  [{ox:0,oy:-18,r:20},{ox:-12,oy:-12,r:16},{ox:12,oy:-12,r:16},{ox:0,oy:-28,r:14}].forEach(c=>{
-    ctx.fillStyle='#2a6a1a';ctx.beginPath();ctx.arc(sx+c.ox,sy+c.oy,c.r,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#3a8a2a';ctx.beginPath();ctx.arc(sx+c.ox-c.r*.15,sy+c.oy-c.r*.15,c.r*.7,0,Math.PI*2);ctx.fill();
-  });
+// ═══════════════════════════════════════════
+//  HOVER LABEL
+// ═══════════════════════════════════════════
+function hoverLabel(obj,sx,sy){
+  if(hoverObj!==obj)return;
+  ctx.font="bold 13px 'Cinzel',serif";ctx.textAlign='center';
+  const lbl=`${obj.icon||''} ${obj.label}`;
+  const lw=ctx.measureText(lbl).width+18;
+  ctx.fillStyle='rgba(20,10,3,0.9)';
+  ctx.beginPath();ctx.roundRect(sx-lw/2,sy-28,lw,24,7);ctx.fill();
+  ctx.fillStyle='#f0c040';ctx.fillText(lbl,sx,sy-9);
 }
 
-// ═══════════════════════════════════════════════════
-//  BUILDINGS  (Serene Village Outside tileset)
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
+//  GEBÄUDE
+// ═══════════════════════════════════════════
 function drawBuilding(b){
   const{x:sx,y:sy}=ws(b.x,b.y);
-  const spr = BLD_SPRITES[b.spr] || BLD_SPRITES.red_small;
-  const drawW = spr.sw * SCALE;
-  const drawH = spr.sh * SCALE;
-
-  if(sx+drawW<0||sx-drawW>canvas.width||sy+20<0||sy-drawH-20>canvas.height)return;
-
-  // Ground shadow
-  ctx.fillStyle='rgba(0,0,0,0.2)';
-  ctx.beginPath();
-  ctx.ellipse(sx, sy+6, drawW*0.42, 10, 0, 0, Math.PI*2);
-  ctx.fill();
-
-  if(imgs.outside && imgs.outside.complete && imgs.outside.naturalWidth>0){
+  const spr=BLD[b.spr]||BLD.rot_klein;
+  const dw=spr.sw*SCALE, dh=spr.sh*SCALE;
+  if(sx+dw<0||sx-dw>canvas.width||sy+20<0||sy-dh-20>canvas.height)return;
+  ctx.fillStyle='rgba(0,0,0,0.18)';
+  ctx.beginPath();ctx.ellipse(sx,sy+6,dw*0.42,10,0,0,Math.PI*2);ctx.fill();
+  if(imgs.outside&&imgs.outside.complete){
     ctx.imageSmoothingEnabled=false;
-    ctx.drawImage(
-      imgs.outside,
-      spr.sx, spr.sy, spr.sw, spr.sh,
-      Math.round(sx - drawW/2), Math.round(sy - drawH),
-      drawW, drawH
-    );
-  } else {
-    // Fallback colored box
-    ctx.fillStyle='#e8d898';
-    ctx.fillRect(sx-drawW/2, sy-drawH, drawW, drawH);
-    ctx.fillStyle='#c04040';
-    ctx.fillRect(sx-drawW/2, sy-drawH, drawW, drawH*0.45);
-    ctx.font='24px serif';
-    ctx.textAlign='center';
-    ctx.fillText(b.icon||'🏠', sx, sy-drawH*0.45);
+    ctx.drawImage(imgs.outside,spr.sx,spr.sy,spr.sw,spr.sh,Math.round(sx-dw/2),Math.round(sy-dh),dw,dh);
+  }else{
+    ctx.fillStyle='#e8d898';ctx.fillRect(sx-dw/2,sy-dh,dw,dh);
+    ctx.fillStyle='#c04040';ctx.fillRect(sx-dw/2,sy-dh,dw,dh*0.4);
   }
-
-  // Hover glow + label
-  if(hoverBld===b){
-    ctx.strokeStyle='rgba(240,192,64,0.85)';
-    ctx.lineWidth=3;
-    ctx.shadowColor='#f0c040';
-    ctx.shadowBlur=18;
-    ctx.beginPath();
-    ctx.ellipse(sx, sy+4, drawW*0.44, 12, 0, 0, Math.PI*2);
-    ctx.stroke();
+  if(hoverObj===b){
+    ctx.strokeStyle='rgba(240,192,64,0.85)';ctx.lineWidth=3;
+    ctx.shadowColor='#f0c040';ctx.shadowBlur=16;
+    ctx.beginPath();ctx.ellipse(sx,sy+4,dw*0.44,12,0,0,Math.PI*2);ctx.stroke();
     ctx.shadowBlur=0;
-
-    ctx.font="bold 13px 'Cinzel',serif";
-    ctx.textAlign='center';
-    const lbl=b.label;
-    const lw=ctx.measureText(lbl).width+20;
+    ctx.font="bold 13px 'Cinzel',serif";ctx.textAlign='center';
+    const lw=ctx.measureText(b.label).width+20;
     ctx.fillStyle='rgba(20,10,3,0.9)';
-    ctx.beginPath();
-    ctx.roundRect(sx-lw/2, sy-drawH-32, lw, 24, 7);
-    ctx.fill();
-    ctx.fillStyle='#f0c040';
-    ctx.fillText(lbl, sx, sy-drawH-13);
+    ctx.beginPath();ctx.roundRect(sx-lw/2,sy-dh-32,lw,24,7);ctx.fill();
+    ctx.fillStyle='#f0c040';ctx.fillText(b.label,sx,sy-dh-13);
   }
 }
 
-// ═══════════════════════════════════════════════════
-//  PLAYER  (Mystic Woods player.png sprite)
-//  Sheet: 288×480, frames 48×48 each, 6 cols × 10 rows
-//  Row 0=walk down, Row 1=walk left, Row 2=walk right, Row 3=walk up
-// ═══════════════════════════════════════════════════
-function drawPlayer(){
+// ═══════════════════════════════════════════
+//  SPIELER
+// ═══════════════════════════════════════════
+function drawMe(){
   const{x:sx,y:sy}=ws(px,py);
-  const DRAW_SCALE=3;
-  const dw=SPR_W*DRAW_SCALE, dh=SPR_H*DRAW_SCALE;
-
-  // Animate walk frames
-  if(pWalk){
-    pFrameTimer++;
-    if(pFrameTimer>=6){pFrameTimer=0; pFrame=(pFrame+1)%WALK_FRAMES;}
-  } else {
-    pFrame=0;
-  }
-
-  const row=WALK_ROWS[pDir]||0;
-  const col=pFrame;
-  const srcX=col*SPR_W, srcY=row*SPR_H;
-
-  // Shadow
-  ctx.fillStyle='rgba(0,0,0,0.25)';
-  ctx.beginPath();
-  ctx.ellipse(sx,sy+4,18,6,0,0,Math.PI*2);
-  ctx.fill();
-
-  if(imgs.player && imgs.player.complete && imgs.player.naturalWidth>0){
+  if(pWalk){pFrameT++;if(pFrameT>=6){pFrameT=0;pFrame=(pFrame+1)%6;}}else pFrame=0;
+  const row=WALK[pDir]||0;
+  const dw=SPR_W*SCALE*1.5, dh=SPR_H*SCALE*1.5;
+  ctx.fillStyle='rgba(0,0,0,0.22)';ctx.beginPath();ctx.ellipse(sx,sy+4,18,6,0,0,Math.PI*2);ctx.fill();
+  if(imgs.player&&imgs.player.complete&&imgs.player.naturalWidth>0){
     ctx.imageSmoothingEnabled=false;
-    ctx.drawImage(imgs.player, srcX,srcY,SPR_W,SPR_H, sx-dw/2,sy-dh+10,dw,dh);
-  } else {
-    // Fallback circle
-    ctx.fillStyle='#4a8aaa';
-    ctx.beginPath();
-    ctx.arc(sx,sy-20,18,0,Math.PI*2);
-    ctx.fill();
-    ctx.fillStyle='#f4e4c1';
-    ctx.font='14px serif';
-    ctx.textAlign='center';
-    ctx.fillText('😊',sx,sy-14);
+    ctx.drawImage(imgs.player,pFrame*SPR_W,row*SPR_H,SPR_W,SPR_H,Math.round(sx-dw/2),Math.round(sy-dh+10),Math.round(dw),Math.round(dh));
   }
-
-  // Name label
   if(player){
-    ctx.font="bold 11px 'Cinzel',serif";
-    ctx.textAlign='center';
+    ctx.font="bold 11px 'Cinzel',serif";ctx.textAlign='center';
     const nw=ctx.measureText(player.name||'?').width;
-    ctx.fillStyle='rgba(18,8,2,0.82)';
-    ctx.beginPath();
-    ctx.roundRect(sx-nw/2-7, sy-dh-4, nw+14, 18, 5);
-    ctx.fill();
-    ctx.fillStyle='#f0c040';
-    ctx.fillText(player.name||'?', sx, sy-dh+11);
+    ctx.fillStyle='rgba(18,8,2,0.85)';ctx.beginPath();ctx.roundRect(sx-nw/2-7,sy-dh-4,nw+14,18,5);ctx.fill();
+    ctx.fillStyle='#f0c040';ctx.fillText(player.name||'?',sx,sy-dh+11);
   }
 }
 
-// ═══════════════════════════════════════════════════
-//  OTHER PLAYERS
-// ═══════════════════════════════════════════════════
-function drawOtherPlayer(op){
+function drawOther(op){
   const{x:sx,y:sy}=ws(op.x,op.y);
-  if(sx<-60||sx>canvas.width+60)return;
-
-  const DRAW_SCALE=3;
-  const dw=SPR_W*DRAW_SCALE, dh=SPR_H*DRAW_SCALE;
-  const dir=op.dir||'down';
-  const frame=op.moving ? Math.floor(animT/6)%WALK_FRAMES : 0;
-  const row=WALK_ROWS[dir]||0;
-  const srcX=frame*SPR_W, srcY=row*SPR_H;
-
-  // Shadow
-  ctx.fillStyle='rgba(0,0,0,0.2)';
-  ctx.beginPath();
-  ctx.ellipse(sx,sy+4,15,5,0,0,Math.PI*2);
-  ctx.fill();
-
-  if(imgs.player && imgs.player.complete && imgs.player.naturalWidth>0){
-    ctx.imageSmoothingEnabled=false;
-    ctx.save();
-    ctx.globalAlpha=0.9;
-    ctx.drawImage(imgs.player, srcX,srcY,SPR_W,SPR_H, sx-dw/2,sy-dh+10,dw,dh);
+  if(sx<-80||sx>canvas.width+80)return;
+  const frame=op.moving?Math.floor(animT/6)%6:0;
+  const row=WALK[op.dir||'down']||0;
+  const dw=SPR_W*SCALE*1.5, dh=SPR_H*SCALE*1.5;
+  ctx.fillStyle='rgba(0,0,0,0.18)';ctx.beginPath();ctx.ellipse(sx,sy+4,15,5,0,0,Math.PI*2);ctx.fill();
+  if(imgs.player&&imgs.player.complete){
+    ctx.imageSmoothingEnabled=false;ctx.save();ctx.globalAlpha=0.9;
+    ctx.drawImage(imgs.player,frame*SPR_W,row*SPR_H,SPR_W,SPR_H,Math.round(sx-dw/2),Math.round(sy-dh+10),Math.round(dw),Math.round(dh));
     ctx.restore();
-  } else {
-    ctx.fillStyle='#6a80aa';
-    ctx.beginPath();
-    ctx.arc(sx,sy-16,15,0,Math.PI*2);
-    ctx.fill();
   }
-
-  // Name
-  ctx.font="bold 10px 'Cinzel',serif";
-  ctx.textAlign='center';
+  ctx.font="bold 10px 'Cinzel',serif";ctx.textAlign='center';
   const nw=ctx.measureText(op.name||'?').width;
-  ctx.fillStyle='rgba(18,8,2,0.82)';
-  ctx.beginPath();
-  ctx.roundRect(sx-nw/2-6,sy-dh-4,nw+12,17,5);
-  ctx.fill();
-  ctx.fillStyle='#80d8ff';
-  ctx.fillText(op.name||'?',sx,sy-dh+10);
+  ctx.fillStyle='rgba(18,8,2,0.82)';ctx.beginPath();ctx.roundRect(sx-nw/2-6,sy-dh-4,nw+12,17,5);ctx.fill();
+  ctx.fillStyle='#80d8ff';ctx.fillText(op.name||'?',sx,sy-dh+10);
 }
 
-// ═══════════════════════════════════════════════════
-//  SPEECH BUBBLES
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
+//  BUBBLES + WORK FX
+// ═══════════════════════════════════════════
 function updateBubbles(){bubbles=bubbles.filter(b=>Date.now()<b.expire);}
 function drawBubbles(){
   bubbles.forEach(b=>{
-    const{x:sx,y:sy}=ws(b.x,b.y-80);
-    ctx.save();
-    ctx.font="13px 'Crimson Text',serif";
+    const{x:sx,y:sy}=ws(b.x,b.y-90);
+    ctx.save();ctx.font="13px 'Crimson Text',serif";
     const tw=ctx.measureText(b.msg).width+20;
-    ctx.fillStyle='rgba(255,255,255,0.95)';
-    ctx.beginPath();ctx.roundRect(sx-tw/2,sy-28,tw,26,8);ctx.fill();
-    ctx.strokeStyle='#c9952a';ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.roundRect(sx-tw/2,sy-28,tw,26,8);ctx.stroke();
-    ctx.fillStyle='rgba(255,255,255,0.95)';
-    ctx.beginPath();ctx.moveTo(sx-5,sy-2);ctx.lineTo(sx,sy+8);ctx.lineTo(sx+5,sy-2);ctx.closePath();ctx.fill();
-    ctx.fillStyle='#2c1810';ctx.textAlign='center';ctx.fillText(b.msg,sx,sy-9);
-    ctx.restore();
+    ctx.fillStyle='rgba(255,255,255,0.96)';ctx.beginPath();ctx.roundRect(sx-tw/2,sy-28,tw,26,8);ctx.fill();
+    ctx.strokeStyle='#c9952a';ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect(sx-tw/2,sy-28,tw,26,8);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.96)';ctx.beginPath();ctx.moveTo(sx-5,sy-2);ctx.lineTo(sx,sy+8);ctx.lineTo(sx+5,sy-2);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#2c1810';ctx.textAlign='center';ctx.fillText(b.msg,sx,sy-9);ctx.restore();
   });
 }
-function bubble(wx,wy,msg){
-  bubbles.push({x:wx,y:wy,msg:msg.length>26?msg.slice(0,26)+'…':msg,expire:Date.now()+4000});
-}
-
-// ═══════════════════════════════════════════════════
-//  WORK FX
-// ═══════════════════════════════════════════════════
+function bubble(wx,wy,msg){bubbles.push({x:wx,y:wy,msg:msg.length>26?msg.slice(0,26)+'…':msg,expire:Date.now()+4000});}
 function drawWorkFX(){
   const{x:sx,y:sy}=ws(workT.x,workT.y);
   const em=workT.res==='wood'?'🪵':workT.res==='stone'?'🪨':'🌾';
   for(let i=0;i<3;i++){
     const t=((animT*0.03+i*0.33)%1);
-    if(t<0.6){
-      ctx.globalAlpha=1-t*1.7;
-      ctx.font='18px serif';
-      ctx.textAlign='center';
-      ctx.fillText(em,sx+Math.cos(i*2.1)*28,sy-t*55-20);
-      ctx.globalAlpha=1;
-    }
+    if(t<0.6){ctx.globalAlpha=1-t*1.7;ctx.font='20px serif';ctx.textAlign='center';ctx.fillText(em,sx+Math.cos(i*2.1)*30,sy-t*60-20);ctx.globalAlpha=1;}
   }
 }
 
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
 //  MINIMAP
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
 function drawMinimap(){
-  const mw2=160, mh2=115, mr=10, mt=58;
-  const ox=canvas.width-mw2-mr, oy=mt;
-  ctx.fillStyle='rgba(30,20,8,0.88)';
-  ctx.beginPath();ctx.roundRect(ox,oy,mw2,mh2,8);ctx.fill();
-  ctx.strokeStyle='#c9952a';ctx.lineWidth=2;
-  ctx.beginPath();ctx.roundRect(ox,oy,mw2,mh2,8);ctx.stroke();
-  const sx=mw2/W, sy2=mh2/H;
-  // Ground
-  ctx.fillStyle='#6aaf5a';
-  ctx.beginPath();ctx.roundRect(ox,oy,mw2,mh2,8);ctx.fill();
-  // Roads
+  const mw2=160,mh2=120,mr=10,mt=58;
+  const ox=canvas.width-mw2-mr,oy=mt;
+  ctx.fillStyle='rgba(30,20,8,0.88)';ctx.beginPath();ctx.roundRect(ox,oy,mw2,mh2,8);ctx.fill();
+  ctx.strokeStyle='#c9952a';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(ox,oy,mw2,mh2,8);ctx.stroke();
+  const sx=mw2/W,sy2=mh2/H;
+  ctx.fillStyle='#6abf5a';ctx.beginPath();ctx.roundRect(ox,oy,mw2,mh2,8);ctx.fill();
+  // Wälder grün
+  ZONES.filter(z=>z.key==='wald').forEach(z=>{ctx.fillStyle='rgba(30,100,20,0.6)';ctx.beginPath();ctx.ellipse(ox+z.x*sx,oy+z.y*sy2,z.r*sx,z.r*sy2,0,0,Math.PI*2);ctx.fill();});
+  // Wege
   ctx.strokeStyle='rgba(210,185,120,0.5)';ctx.lineWidth=3;
-  ROADS.forEach(pts=>{
-    ctx.beginPath();
-    const p0=pts[0];ctx.moveTo(ox+p0.x*sx,oy+p0.y*sy2);
-    pts.slice(1).forEach(p=>ctx.lineTo(ox+p.x*sx,oy+p.y*sy2));
-    ctx.stroke();
-  });
-  // Buildings (yellow dots)
-  BUILDINGS.forEach(b=>{
-    ctx.fillStyle='rgba(240,192,64,0.9)';
-    ctx.beginPath();ctx.roundRect(ox+b.x*sx-3,oy+b.y*sy2-3,6,6,2);ctx.fill();
-  });
-  // Zones (green dots)
-  ZONES.forEach(z=>{
-    const col=z.key==='pond'?'rgba(80,160,255,0.7)':z.key==='field'?'rgba(180,220,60,0.7)':'rgba(40,120,40,0.7)';
-    ctx.fillStyle=col;
-    ctx.beginPath();ctx.arc(ox+z.x*sx,oy+z.y*sy2,3,0,Math.PI*2);ctx.fill();
-  });
-  // Viewport rect
-  const vx=ox+camX*sx, vy=oy+camY*sy2;
+  ROADS.forEach(pts=>{ctx.beginPath();const p0=pts[0];ctx.moveTo(ox+p0.x*sx,oy+p0.y*sy2);pts.slice(1).forEach(p=>ctx.lineTo(ox+p.x*sx,oy+p.y*sy2));ctx.stroke();});
+  // Gebäude
+  BUILDINGS.forEach(b=>{ctx.fillStyle='rgba(240,192,64,0.9)';ctx.beginPath();ctx.roundRect(ox+b.x*sx-3,oy+b.y*sy2-3,6,6,2);ctx.fill();});
+  // Viewport
+  const vx=ox+camX*sx,vy=oy+camY*sy2;
   ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=1.5;
-  ctx.beginPath();
-  ctx.roundRect(
-    Math.max(ox,vx), Math.max(oy,vy),
-    Math.min(canvas.width*sx, mw2-(vx-ox)),
-    Math.min(canvas.height*sy2, mh2-(vy-oy)),
-    2
-  );ctx.stroke();
-  // Player dot
-  ctx.fillStyle='#f0c040';
-  ctx.beginPath();ctx.arc(ox+px*sx, oy+py*sy2, 4,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.roundRect(Math.max(ox,vx),Math.max(oy,vy),Math.min(canvas.width*sx,mw2-(vx-ox)),Math.min(canvas.height*sy2,mh2-(vy-oy)),2);ctx.stroke();
+  ctx.fillStyle='#f0c040';ctx.beginPath();ctx.arc(ox+px*sx,oy+py*sy2,4,0,Math.PI*2);ctx.fill();
   ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.stroke();
-  // Others
-  others.forEach(o=>{
-    ctx.fillStyle='#80d8ff';
-    ctx.beginPath();ctx.arc(ox+o.x*sx,oy+o.y*sy2,3,0,Math.PI*2);ctx.fill();
-  });
   canvas._mm={ox,oy,mw2,mh2,sx,sy2};
 }
 
-// ═══════════════════════════════════════════════════
-//  MOVEMENT
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
+//  BEWEGUNG
+// ═══════════════════════════════════════════
 function walkTo(tx,ty,cb){
-  if(wTimer)clearTimeout(wTimer);
-  wPath=[];pWalk=true;workT=null;closePanel();
-  const dx=tx-px, dy=ty-py;
-  // Set direction
-  if(Math.abs(dx)>Math.abs(dy)) pDir=dx>=0?'right':'left';
+  if(wTimer)clearTimeout(wTimer);wPath=[];pWalk=true;workT=null;closePanel();
+  const dx=tx-px,dy=ty-py;
+  if(Math.abs(dx)>Math.abs(dy))pDir=dx>=0?'right':'left';
   else pDir=dy>=0?'down':'up';
-  const steps=Math.max(25,Math.round(Math.hypot(dx,dy)/3.2));
-  for(let i=1;i<=steps;i++) wPath.push({x:px+dx*(i/steps),y:py+dy*(i/steps)});
+  const steps=Math.max(30,Math.round(Math.hypot(dx,dy)/3.5));
+  for(let i=1;i<=steps;i++)wPath.push({x:px+dx*(i/steps),y:py+dy*(i/steps)});
   function step(){
     if(!wPath.length){pWalk=false;pFrame=0;if(cb)cb();return;}
-    const p=wPath.shift();
-    const prevX=px;
-    px=p.x;py=p.y;
-    // Update direction based on movement
-    const mdx=px-prevX;
-    if(Math.abs(mdx)>1) pDir=mdx>0?'right':'left';
-    else pDir=p.y>py?'down':'up';
-    camX+=(px-canvas.width/2-camX)*0.08;
-    camY+=(py-canvas.height/2-camY)*0.08;
-    camX=Math.max(0,Math.min(W-canvas.width,camX));
-    camY=Math.max(0,Math.min(H-canvas.height,camY));
+    const p=wPath.shift();const prevX=px;px=p.x;py=p.y;
+    const mdx=px-prevX;if(Math.abs(mdx)>0.5)pDir=mdx>0?'right':'left';
+    camX+=(px-canvas.width/2-camX)*0.07;camY+=(py-canvas.height/2-camY)*0.07;
+    camX=Math.max(0,Math.min(W-canvas.width,camX));camY=Math.max(0,Math.min(H-canvas.height,camY));
     wTimer=setTimeout(step,14);
-  }
-  step();
+  }step();
 }
 
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
 //  DRAG + INERTIA
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
 function applyInertia(){
   if(drag.on)return;
   if(Math.abs(drag.vx)<0.1&&Math.abs(drag.vy)<0.1){drag.vx=0;drag.vy=0;return;}
@@ -1792,277 +1653,186 @@ function applyInertia(){
   camY=Math.max(0,Math.min(H-canvas.height,camY+drag.vy));
   drag.vx*=0.88;drag.vy*=0.88;
 }
-
 mw.addEventListener('pointerdown',e=>{
   const mm=canvas._mm;
-  if(mm){
-    const rect=canvas.getBoundingClientRect(),rx=e.clientX-rect.left,ry=e.clientY-rect.top;
+  if(mm){const rect=canvas.getBoundingClientRect(),rx=e.clientX-rect.left,ry=e.clientY-rect.top;
     if(rx>mm.ox&&rx<mm.ox+mm.mw2&&ry>mm.oy&&ry<mm.oy+mm.mh2){
       camX=Math.max(0,Math.min(W-canvas.width,((rx-mm.ox)/mm.mw2)*W-canvas.width/2));
-      camY=Math.max(0,Math.min(H-canvas.height,((ry-mm.oy)/mm.mh2)*H-canvas.height/2));
-      return;
-    }
-  }
-  drag.on=true;didDrag=false;
-  drag.sx=e.clientX;drag.sy=e.clientY;
-  drag.cx=camX;drag.cy=camY;
-  drag.vx=0;drag.vy=0;drag.t=Date.now();
-  mw.classList.add('drag');
-  mw.setPointerCapture(e.pointerId);
+      camY=Math.max(0,Math.min(H-canvas.height,((ry-mm.oy)/mm.mh2)*H-canvas.height/2));return;}}
+  drag.on=true;didDrag=false;drag.sx=e.clientX;drag.sy=e.clientY;drag.cx=camX;drag.cy=camY;drag.vx=0;drag.vy=0;drag.t=Date.now();
+  mw.classList.add('drag');mw.setPointerCapture(e.pointerId);
 });
-
 mw.addEventListener('pointermove',e=>{
   if(!drag.on)return;
-  const dx=e.clientX-drag.sx, dy=e.clientY-drag.sy;
+  const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
   if(Math.abs(dx)>5||Math.abs(dy)>5)didDrag=true;
   const nx=Math.max(0,Math.min(W-canvas.width,drag.cx-dx));
   const ny=Math.max(0,Math.min(H-canvas.height,drag.cy-dy));
   const now=Date.now(),dt=now-drag.t||16;
-  drag.vx=(nx-camX)/(dt*0.01+1)*0.6;
-  drag.vy=(ny-camY)/(dt*0.01+1)*0.6;
-  camX=nx;camY=ny;drag.t=now;
-  updateHover(e.clientX,e.clientY);
+  drag.vx=(nx-camX)/(dt*0.01+1)*0.6;drag.vy=(ny-camY)/(dt*0.01+1)*0.6;
+  camX=nx;camY=ny;drag.t=now;updateHover(e.clientX,e.clientY);
 });
-
 mw.addEventListener('pointerup',e=>{
-  if(!drag.on)return;
-  drag.on=false;mw.classList.remove('drag');
+  if(!drag.on)return;drag.on=false;mw.classList.remove('drag');
   if(!didDrag){
     const rect=canvas.getBoundingClientRect();
-    const sx2=e.clientX-rect.left, sy2=e.clientY-rect.top;
-    const wx=sx2+camX, wy=sy2+camY;
-    // Check buildings
-    const hitBld=BUILDINGS.find(b=>{
-      const spr=BLD_SPRITES[b.spr]||BLD_SPRITES.red_small;
-      const hw=spr.sw*SCALE*0.5, hh=spr.sh*SCALE;
-      return wx>b.x-hw&&wx<b.x+hw&&wy>b.y-hh&&wy<b.y+10;
-    });
-    if(hitBld){clickBuilding(hitBld);return;}
-    // Check zones
-    const hitZone=ZONES.find(z=>Math.hypot(wx-z.x,wy-z.y)<z.r);
-    if(hitZone){clickZone(hitZone);return;}
-    // Walk to point
-    walkTo(wx,wy,null);
+    const sx=e.clientX-rect.left+camX,sy=e.clientY-rect.top+camY;
+    const hb=BUILDINGS.find(b=>{const s=BLD[b.spr]||BLD.rot_klein;return sx>b.x-s.sw&&sx<b.x+s.sw&&sy>b.y-s.sh*2&&sy<b.y+10;});
+    if(hb){clickBld(hb);return;}
+    const hz=ZONES.find(z=>Math.hypot(sx-z.x,sy-z.y)<z.r);
+    if(hz){clickZone(hz);return;}
+    walkTo(sx,sy,null);
   }
 });
-
-mw.addEventListener('mousemove',e=>{
-  if(drag.on)return;
-  updateHover(e.clientX,e.clientY);
-});
-
+mw.addEventListener('mousemove',e=>{if(!drag.on)updateHover(e.clientX,e.clientY);});
 function updateHover(cx,cy){
   const rect=canvas.getBoundingClientRect();
-  const sx2=cx-rect.left, sy2=cy-rect.top;
-  const wx=sx2+camX, wy=sy2+camY;
-  // Check buildings using sprite size
-  hoverBld=BUILDINGS.find(b=>{
-    const spr=BLD_SPRITES[b.spr]||BLD_SPRITES.red_small;
-    const hw=spr.sw*SCALE*0.5, hh=spr.sh*SCALE*0.5;
-    return wx>b.x-hw&&wx<b.x+hw&&wy>b.y-hh*2&&wy<b.y+10;
-  }) || ZONES.find(z=>Math.hypot(wx-z.x,wy-z.y)<z.r) || null;
-  canvas.style.cursor=hoverBld?'pointer':'grab';
+  const wx=cx-rect.left+camX,wy=cy-rect.top+camY;
+  hoverObj=BUILDINGS.find(b=>{const s=BLD[b.spr]||BLD.rot_klein;return wx>b.x-s.sw&&wx<b.x+s.sw&&wy>b.y-s.sh*2&&wy<b.y+10;})
+    ||ZONES.find(z=>Math.hypot(wx-z.x,wy-z.y)<z.r)||null;
+  canvas.style.cursor=hoverObj?'pointer':'grab';
 }
-
 window.addEventListener('keydown',e=>{
-  const sp=28;
-  if(e.key==='ArrowLeft')camX=Math.max(0,camX-sp);
-  if(e.key==='ArrowRight')camX=Math.min(W-canvas.width,camX+sp);
-  if(e.key==='ArrowUp')camY=Math.max(0,camY-sp);
-  if(e.key==='ArrowDown')camY=Math.min(H-canvas.height,camY+sp);
-  if(e.key==='Escape'){closePanel();}
+  const sp=32;
+  if(e.key==='ArrowLeft')camX=Math.max(0,camX-sp);if(e.key==='ArrowRight')camX=Math.min(W-canvas.width,camX+sp);
+  if(e.key==='ArrowUp')camY=Math.max(0,camY-sp);if(e.key==='ArrowDown')camY=Math.min(H-canvas.height,camY+sp);
+  if(e.key==='Escape')closePanel();
 });
 
-// ═══════════════════════════════════════════════════
-//  OTHERS AI MOVEMENT
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
+//  ANDERE SPIELER
+// ═══════════════════════════════════════════
 function updateOthers(){
   others.forEach(o=>{
     o.timer=(o.timer||0)+1;
     if(!o.tx||o.timer>o.interval){
-      o.timer=0;o.interval=160+Math.floor(Math.random()*240);
-      const targets=[...BUILDINGS,...ZONES];
-      const t=targets[Math.floor(Math.random()*targets.length)];
-      o.tx=t.x+(-40+Math.random()*80);
-      o.ty=t.y+(-40+Math.random()*80);
+      o.timer=0;o.interval=180+Math.floor(Math.random()*260);
+      const tgts=[...BUILDINGS,...ZONES];
+      const t=tgts[Math.floor(Math.random()*tgts.length)];
+      o.tx=t.x+(-50+Math.random()*100);o.ty=t.y+(-50+Math.random()*100);
     }
-    const dx=o.tx-o.x, dy=o.ty-o.y, d=Math.hypot(dx,dy);
-    if(d>5){
-      o.x+=dx/d*2.2;o.y+=dy/d*2.2;
-      if(Math.abs(dx)>Math.abs(dy)) o.dir=dx>0?'right':'left';
-      else o.dir=dy>0?'down':'up';
-      o.moving=true;
-    } else o.moving=false;
+    const dx=o.tx-o.x,dy=o.ty-o.y,d=Math.hypot(dx,dy);
+    if(d>5){o.x+=dx/d*2.2;o.y+=dy/d*2.2;o.dir=Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up');o.moving=true;}
+    else o.moving=false;
   });
 }
 
-// ═══════════════════════════════════════════════════
-//  BUILDING INTERACTIONS
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
+//  GEBÄUDE-AKTIONEN
+// ═══════════════════════════════════════════
 const LOC={
-  myhouse: {ico:'🏠',title:'Mein Haus',desc:'Dein gemütliches Zuhause. Hier tankst du Kraft.',
-    act:[{l:'😴 Ausruhen (+10 XP)',f:()=>{gXP(10);notify('+10 XP ✨');}},]},
-  taverne: {ico:'🍺',title:'Hildegards Taverne',desc:'Frisches Bier und warme Neuigkeiten aus dem Dorf.',
-    act:[{l:'🍺 Met trinken (+8 XP)',f:()=>{gXP(8);notify('+8 XP 🍺');}},{l:'🎲 Würfeln (+5🪵)',f:()=>{addR('wood',5);notify('+5 🪵 gewonnen!');}},]},
-  schmiede:{ico:'⚒️',title:'Ragnars Schmiede',desc:'Funken sprühen. Ragnar hämmert von früh bis spät.',
-    act:[{l:'⚒️ Mithelfen (+15XP +3🪨)',f:()=>{gXP(15);addR('stone',3);notify('+15 XP +3 🪨');}},]},
-  markt:   {ico:'🛒',title:'Marktplatz',desc:'Händler aus aller Welt bieten ihre Waren an.',
-    act:[{l:'🪵 Holz verkaufen (10🪵→5💰)',f:()=>{trade('wood',10,'gold',5);}},{l:'🪨 Stein kaufen (3💰→4🪨)',f:()=>{trade('gold',3,'stone',4);}},]},
-  kirche:  {ico:'⛪',title:'Dorfkirche',desc:'Stille und Frieden. Der älteste Bau im Dorf.',
-    act:[{l:'🙏 Beten (+12 XP)',f:()=>{gXP(12);notify('+12 XP Segen! 🙏');}},]},
-  mill:    {ico:'⚙️',title:'Die Mühle',desc:'Das Rad dreht sich. Korn zu Mehl, Mehl zu Brot.',
-    act:[{l:'⚙️ Mahlen (8🌾→4💰)',f:()=>{trade('food',8,'gold',4);}},{l:'🔧 Mithelfen (+4 XP)',f:()=>{gXP(4);notify('+4 XP');}},]},
-  scheune: {ico:'🏚️',title:'Scheune',desc:'Heu und Vorräte. Riecht nach trockenem Stroh.',
-    act:[{l:'📦 Einlagern (+6 XP)',f:()=>{gXP(6);notify('+6 XP 📦');}},]},
+  myhouse: {ico:'🏠',title:'Mein Haus',desc:'Dein gemütliches Zuhause.',
+    act:[{l:'😴 Ausruhen (+10 XP)',f:()=>{gXP(10);notify('+10 XP ✨');closePanel();}}]},
+  taverne: {ico:'🍺',title:'Hildegards Taverne',desc:'Frisches Bier und warme Neuigkeiten.',
+    act:[{l:'🍺 Met trinken (+8 XP)',f:()=>{gXP(8);notify('+8 XP 🍺');closePanel();}},
+         {l:'🎲 Würfeln (+5🪵)',f:()=>{addR('wood',5);notify('+5 🪵');closePanel();}}]},
+  schmiede:{ico:'⚒️',title:'Ragnars Schmiede',desc:'Funken sprühen. Ragnar hämmert.',
+    act:[{l:'⚒️ Mithelfen (+15XP +3🪨)',f:()=>{gXP(15);addR('stone',3);notify('+15XP +3🪨');closePanel();}}]},
+  markt:   {ico:'🛒',title:'Marktplatz',desc:'Händler aus aller Welt.',
+    act:[{l:'🪵 Holz verkaufen (10🪵→5💰)',f:()=>{trade('wood',10,'gold',5);}},
+         {l:'🪨 Stein kaufen (3💰→4🪨)',f:()=>{trade('gold',3,'stone',4);}}]},
+  kirche:  {ico:'⛪',title:'Dorfkirche',desc:'Stille und Frieden.',
+    act:[{l:'🙏 Beten (+12 XP)',f:()=>{gXP(12);notify('+12 XP 🙏');closePanel();}}]},
+  mill:    {ico:'⚙️',title:'Die Mühle',desc:'Das Rad dreht sich unaufhörlich.',
+    act:[{l:'⚙️ Mahlen (8🌾→4💰)',f:()=>{trade('food',8,'gold',4);}},
+         {l:'🔧 Mithelfen (+4XP)',f:()=>{gXP(4);notify('+4 XP');closePanel();}}]},
+  scheune: {ico:'🏚️',title:'Scheune',desc:'Heu und Vorräte.',
+    act:[{l:'📦 Einlagern (+6 XP)',f:()=>{gXP(6);notify('+6 XP 📦');closePanel();}}]},
+  brunnen: {ico:'💧',title:'Der Brunnen',desc:'Frisches Wasser für das Dorf.',
+    act:[{l:'💧 Wasser holen (+5 XP)',f:()=>{gXP(5);notify('+5 XP 💧');closePanel();}}]},
 };
-
-function clickBuilding(b){
-  const loc=LOC[b.key];
-  if(!loc)return;
-  walkTo(b.x,b.y-20,()=>{
-    openPanel(b.icon||'🏠',loc.title,loc.desc,loc.act);
-    bubble(px,py,'Ich bin da!');
-  });
+function clickBld(b){
+  const loc=LOC[b.key];if(!loc)return;
+  walkTo(b.x,b.y-20,()=>{openPanel(b.icon,loc.title,loc.desc,loc.act);bubble(px,py,'Ich bin da!');});
 }
-
 function clickZone(z){
   const acts={
-    wald:   [{l:'🪓 Holz fällen (15s)',f:()=>{startWork(z,'wood',5,15);}},{l:'🌿 Pilze (+3🌾)',f:()=>{addR('food',3);notify('+3 🌾');closePanel();}}],
-    quarry: [{l:'⛏️ Steine abbauen (12s)',f:()=>{startWork(z,'stone',3,12);}}],
-    lehm:   [{l:'🏺 Lehm graben (10s)',f:()=>{startWork(z,'stone',4,10);}}],
-    field:  [{l:'🌾 Ernten (10s)',f:()=>{startWork(z,'food',8,10);}},{l:'🌱 Bestellen',f:()=>{if(getR('food')<5){notify('Nicht genug!','e');return;}addR('food',-5);notify('Bestellt!');closePanel();}}],
-    pond:   [{l:'🎣 Angeln (+4🌾 +5XP)',f:()=>{addR('food',4);gXP(5);notify('+4🌾 +5XP');closePanel();}},{l:'🏊 Schwimmen (+3XP)',f:()=>{gXP(3);notify('+3XP 💦');closePanel();}}],
+    wald:   [{l:'🪓 Holz fällen (15s)',f:()=>{startWork(z,'wood',6,15);}},
+             {l:'🌿 Pilze (+3🌾)',f:()=>{addR('food',3);notify('+3 🌾');closePanel();}}],
+    quarry: [{l:'⛏️ Steine abbauen (12s)',f:()=>{startWork(z,'stone',4,12);}},
+             {l:'💎 Edelstein suchen',f:()=>{if(Math.random()<0.3){addR('gold',3);notify('Edelstein! +3💰');}else notify('Nur Kies…');closePanel();}}],
+    lehm:   [{l:'🏺 Lehm graben (10s)',f:()=>{startWork(z,'stone',5,10);}},
+             {l:'🧱 Ziegel formen (5🪨→3💰)',f:()=>{trade('stone',5,'gold',3);}}],
+    field:  [{l:'🌾 Ernten (10s)',f:()=>{startWork(z,'food',10,10);}},
+             {l:'🌱 Feld bestellen',f:()=>{if(getR('food')<5){notify('Nicht genug!','e');return;}addR('food',-5);notify('Bestellt!');closePanel();}}],
+    pond:   [{l:'🎣 Angeln (+5🌾 +5XP)',f:()=>{addR('food',5);gXP(5);notify('+5🌾 +5XP');closePanel();}},
+             {l:'🏊 Schwimmen (+3XP)',f:()=>{gXP(3);notify('+3XP 💦');closePanel();}}],
   };
   const a=acts[z.key]||[];
-  walkTo(z.x,z.y,()=>{
-    openPanel(z.icon||'🌿',z.label,'Klicke eine Aktion!',a);
-    bubble(px,py,'Hier bin ich!');
-  });
+  walkTo(z.x,z.y,()=>{openPanel(z.icon,z.label,'Klicke eine Aktion!',a);bubble(px,py,'Hier bin ich!');});
 }
-
 function openPanel(ico,title,desc,acts){
   document.getElementById('apico').textContent=ico;
   document.getElementById('aptitle').textContent=title;
   document.getElementById('apdesc').textContent=desc;
-  const btns=document.getElementById('apbtns');
-  btns.innerHTML='';
-  acts.forEach(a=>{
-    const btn=document.createElement('button');
-    btn.className='abt';btn.textContent=a.l;
-    btn.onclick=a.f;btns.appendChild(btn);
-  });
-  const cl=document.createElement('button');
-  cl.className='abt s';cl.textContent='✕ Schließen';
-  cl.onclick=closePanel;btns.appendChild(cl);
+  const btns=document.getElementById('apbtns');btns.innerHTML='';
+  acts.forEach(a=>{const btn=document.createElement('button');btn.className='abt';btn.textContent=a.l;btn.onclick=a.f;btns.appendChild(btn);});
+  const cl=document.createElement('button');cl.className='abt s';cl.textContent='✕ Schließen';cl.onclick=closePanel;btns.appendChild(cl);
   document.getElementById('approg').style.display='none';
   document.getElementById('ap').classList.add('open');
 }
 function closePanel(){document.getElementById('ap').classList.remove('open');}
-
 function startWork(zone,res,amt,secs){
   closePanel();workT=zone;
   document.getElementById('approg').style.display='block';
   document.getElementById('ap').classList.add('open');
   document.getElementById('apico').textContent=zone.icon||'⚙️';
   document.getElementById('aptitle').textContent=`Arbeite… ${secs}s`;
-  document.getElementById('apdesc').textContent='Durchhalten – gleich fertig!';
+  document.getElementById('apdesc').textContent='Durchhalten!';
   document.getElementById('apbtns').innerHTML=`<button class="abt s" onclick="cancelWork()">✕ Abbrechen</button>`;
   const fill=document.getElementById('apfill');
-  const start=Date.now(), total=secs*1000;
+  const start=Date.now(),total=secs*1000;
   if(wTimer2)clearInterval(wTimer2);
   wTimer2=setInterval(()=>{
-    const el=Date.now()-start, pct=Math.min(100,el/total*100);
+    const el=Date.now()-start,pct=Math.min(100,el/total*100);
     fill.style.width=pct+'%';
     document.getElementById('aptitle').textContent=`Arbeite… ${Math.ceil((total-el)/1000)}s`;
-    if(el>=total){
-      clearInterval(wTimer2);workT=null;
-      addR(res,amt);gXP(Math.floor(amt*2));
-      notify(`+${amt} ${res==='wood'?'🪵':res==='stone'?'🪨':'🌾'} +${Math.floor(amt*2)} XP`);
-      closePanel();
-    }
+    if(el>=total){clearInterval(wTimer2);workT=null;addR(res,amt);gXP(Math.floor(amt*2));
+      notify(`+${amt} ${res==='wood'?'🪵':res==='stone'?'🪨':'🌾'} +${Math.floor(amt*2)}XP`);closePanel();}
   },80);
 }
 function cancelWork(){clearInterval(wTimer2);workT=null;closePanel();}
-
 function trade(fr,fa,to,ta){
   if(getR(fr)<fa){notify('Nicht genug!','e');return;}
-  addR(fr,-fa);addR(to,ta);notify(`Gehandelt! -${fa} +${ta}`);gXP(4);closePanel();
+  addR(fr,-fa);addR(to,ta);notify(`-${fa} +${ta} ✓`);gXP(4);closePanel();
 }
 
-// ═══════════════════════════════════════════════════
-//  RESOURCES + XP
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
+//  RESSOURCEN + XP
+// ═══════════════════════════════════════════
 function getR(r){return player?.res?.[r]||0;}
-function addR(r,n){if(!player)return;if(!player.res)player.res={};player.res[r]=Math.max(0,(player.res[r]||0)+n);syncUI();saveP();}
-function gXP(n){if(!player)return;player.xp=(player.xp||0)+n;if(player.xp>=getLv()*100){player.xp-=getLv()*100;player.level=(player.level||1)+1;notify(`🎉 Level Up! Level ${player.level}!`);}syncUI();saveP();}
-function getLv(){return player?.level||1;}
+function addR(r,n){if(!player)return;player.res=player.res||{};player.res[r]=Math.max(0,(player.res[r]||0)+n);syncUI();saveP();}
+function gXP(n){if(!player)return;player.xp=(player.xp||0)+n;if(player.xp>=(player.level||1)*100){player.xp-=(player.level||1)*100;player.level=(player.level||1)+1;notify(`🎉 Level ${player.level}!`);}syncUI();saveP();}
 function syncUI(){
   if(!player)return;
   ['rw','rs','rf','rg'].forEach((id,i)=>document.getElementById(id).textContent=getR(['wood','stone','food','gold'][i]));
   document.getElementById('tbn').textContent=player.name||'—';
-  document.getElementById('tbl').textContent='Lv '+(player.level||1);
+  document.getElementById('tbl').textContent='Lv'+(player.level||1);
 }
 function notify(msg,t=''){
-  const d=document.createElement('div');
-  d.className='notif'+(t==='e'?' err':'');
-  d.textContent=msg;
+  const d=document.createElement('div');d.className='notif'+(t==='e'?' err':'');d.textContent=msg;
   document.getElementById('na').appendChild(d);
   setTimeout(()=>{d.style.transition='opacity .4s';d.style.opacity='0';},2500);
   setTimeout(()=>d.remove(),3000);
 }
-
-// ═══════════════════════════════════════════════════
-//  SAVE / LOAD
-// ═══════════════════════════════════════════════════
-function saveP(){
-  if(!player)return;
-  const ps=JSON.parse(localStorage.getItem('dfl_players')||'[]');
-  const i=ps.findIndex(p=>p.id===player.id);
-  if(i!==-1)ps[i]=player;
-  localStorage.setItem('dfl_players',JSON.stringify(ps));
-}
+function saveP(){if(!player)return;const ps=JSON.parse(localStorage.getItem('dfl_players')||'[]');const i=ps.findIndex(p=>p.id===player.id);if(i!==-1)ps[i]=player;localStorage.setItem('dfl_players',JSON.stringify(ps));}
 function loadPlayer(){
-  const id=localStorage.getItem('dfl_active');
-  const ps=JSON.parse(localStorage.getItem('dfl_players')||'[]');
+  const id=localStorage.getItem('dfl_active'),ps=JSON.parse(localStorage.getItem('dfl_players')||'[]');
   player=ps.find(p=>p.id===id)||ps[0]||null;
-  if(player){
-    px=player.mapX||1080;py=player.mapY||750;
-    camX=Math.max(0,Math.min(W-canvas.width,px-canvas.width/2));
-    camY=Math.max(0,Math.min(H-canvas.height,py-canvas.height/2));
-    others=ps.filter(p=>p.id!==player.id).map(p=>({
-      id:p.id,name:p.name,charId:p.charId,
-      x:700+Math.random()*700,y:500+Math.random()*600,
-      interval:180,timer:Math.floor(Math.random()*180),
-      dir:'down',moving:false
-    }));
-  }
+  if(player){px=player.mapX||1600;py=player.mapY||1200;camX=Math.max(0,Math.min(W-canvas.width,px-canvas.width/2));camY=Math.max(0,Math.min(H-canvas.height,py-canvas.height/2));
+    others=ps.filter(p=>p.id!==player.id).map(p=>({id:p.id,name:p.name,charId:p.charId,x:1400+Math.random()*600,y:1000+Math.random()*600,interval:200,timer:0,dir:'down',moving:false}));}
 }
 window.addEventListener('message',e=>{
   if(e.data?.type==='setPlayer'){
     player=e.data.player;
     const ps=JSON.parse(localStorage.getItem('dfl_players')||'[]');
-    others=ps.filter(p=>p.id!==player.id).map(p=>({
-      id:p.id,name:p.name,charId:p.charId,
-      x:700+Math.random()*700,y:500+Math.random()*600,
-      interval:180,timer:0,dir:'down',moving:false
-    }));
+    others=ps.filter(p=>p.id!==player.id).map(p=>({id:p.id,name:p.name,charId:p.charId,x:1400+Math.random()*600,y:1000+Math.random()*600,interval:200,timer:0,dir:'down',moving:false}));
     syncUI();
   }
 });
 
-// ═══════════════════════════════════════════════════
-//  START
-// ═══════════════════════════════════════════════════
-loadPlayer();
-syncUI();
-
-// Load assets then start
-loadAssets(()=>{
-  assetsReady=true;
-  loop();
-});
-// Start loop immediately (shows loading screen)
-loop();
+loadPlayer();syncUI();loop();
+loadAssets(()=>{assetsReady=true;});
 </script>
 </body>
 </html>
