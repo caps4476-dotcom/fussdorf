@@ -159,6 +159,16 @@ const R={
   smithing:{n:'Schmiedekunst',i:'⚒️',cost:{research:70,gold:70},need:['smelting'],desc:'Schaltet den Werkzeugschmied frei.'},
   tools3:{n:'Meisterwerkzeuge',i:'🛠️',cost:{research:120,tools:10,gold:150},need:['smithing','tools2'],desc:'+25 % auf alle Produktion.'}
 };
+Object.assign(R,{
+  agri2:{n:'Fruchtfolge',i:'🌱',cost:{research:120,gold:120},need:['milling'],desc:'+25 % Nahrung und Getreide.'},
+  mining2:{n:'Tiefbau',i:'🪨',cost:{research:150,gold:150,tools:10},need:['mining','tools2'],desc:'+25 % Stein und Erz.'},
+  arch1:{n:'Baukunst',i:'🏛️',cost:{research:180,gold:250,planks:100},need:['tools2'],desc:'Gebäude bis Stufe 7 (wenn genug Zonen frei sind).'},
+  arch2:{n:'Meisterbaukunst',i:'🏰',cost:{research:450,gold:600,tools:40},need:['arch1','vehicles'],edu:6,desc:'Gebäude bis Stufe 10.'}
+});
+for(const k in R){const c=R[k].cost;for(const r in c)c[r]=Math.round(c[r]*(r==='research'?3:r==='gold'?2.5:2))}
+for(const k in B){if(B[k].cost)B[k].cost0=Object.assign({},B[k].cost);if(['camp','house','gatherer','woodcutter','quarry','flowerbed'].includes(k)||!B[k].cost)continue;const c=B[k].cost;for(const r in c)c[r]=Math.round(c[r]*2.5)}
+const resTime=r=>Math.round(120+r.cost.research*5);
+const resSpeed=()=>Math.min(2,1+.05*eduCount());
 const GOALS=[
   {t:'Baue dein erstes Haus 🏠',ok:()=>has('house')},
   {t:'Tippe einen Baum an und schicke einen Bewohner Holz sammeln',ok:()=>S.flags.gathered},
@@ -252,7 +262,7 @@ const STORY=[
 ];
 const STORY_NEXT={lv:20,t:'Ein neuer Wanderer am Horizont …'};
 const NEAR_N={1:'Baum',2:'Felsen',3:'Erzader',4:'Wasser'};
-const HOUSE_BEDS=[2,4,7,10,14], HOUSE_I=['🛖','🏠','🏡','🏘️','🏘️'], HOUSE_ROOF=['#9a6b3a','#c0503a','#b8433a','#8e3b5a','#3d5a8e'];
+const HOUSE_BEDS=[2,4,7,10,14,18,23,28,34,40], HOUSE_I=['🛖','🏠','🏡','🏘️','🏘️','🏘️','🏢','🏢','🏰','🏰'], HOUSE_ROOF=['#9a6b3a','#c0503a','#b8433a','#8e3b5a','#3d5a8e','#2e6a7a','#5a5a6a','#4a4a7a','#7a2a4a','#8a6a1a'];
 const SEAS=[
   {n:'Frühling',i:'🌸',grass:['#5a9a3c','#5f9f40','#57963a','#5c9c3e'],tree:['#2e6b2b','#336f2c','#2a6327'],hi:'#4f9a42',fl:1,water:'#3b7dc0',food:1},
   {n:'Sommer',i:'☀️',grass:['#6a9e3a','#70a23d','#659936','#6c9f3b'],tree:['#2c6326','#30682a','#285c24'],hi:'#47873a',fl:1,water:'#3a80c4',food:1.2},
@@ -281,13 +291,13 @@ const byId=id=>S.buildings.find(b=>b.id===id);
 const isSite=b=>b.cs>0&&!b.up;
 const has=t=>S.buildings.some(b=>b.type===t&&!isSite(b));
 const sumC=c=>Object.values(c).reduce((a,b)=>a+b,0);
-const buildTime=c=>Math.round(Math.min(120,6+.35*sumC(c)));
-const upTime=c=>Math.round(Math.min(180,8+.25*sumC(c)));
+const buildTime=c=>Math.round(Math.min(600,15+.8*sumC(c)));
+const upTime=c=>Math.round(Math.min(2400,30+.5*sumC(c)));
 const bSpeed=()=>S.hero&&S.hero.c==='brunolf'?1.35:1;
 const heroName=()=>S.hero?HEROES[S.hero.c].n:'Held';
 function nextSite(){let best=null;for(const b of S.buildings)if(b.cs>0&&!b.self&&(!best||(b.qs||0)<(best.qs||0)))best=b;return best}
 const zonesCount=()=>S.zones.filter(Boolean).length;
-const maxLevel=()=>Math.min(5,zonesCount()+1);
+const maxLevel=()=>Math.min(zonesCount()+1,S.tech.arch2?10:S.tech.arch1?7:5);
 const beds=(b,L)=>isSite(b)?0:b.type==='house'?HOUSE_BEDS[(L||b.level)-1]:b.type==='camp'?2:0;
 const seasonIdx=()=>Math.floor(S.gt/SEASON)%4;
 const dayNo=()=>Math.floor(S.gt/DAY)+1;
@@ -388,7 +398,7 @@ const slots=b=>B[b.type].slots?B[b.type].slots+(b.level-1):0;
 function countNear(x,y,t,r){let n=0;for(let yy=y-r;yy<=y+r;yy++)for(let xx=x-r;xx<=x+r;xx++){if(inMap(xx,yy)&&S.tiles[xx+yy*W]===t&&Math.hypot(xx-x,yy-y)<=r+.5)n++}return n}
 function effAt(type,x,y){const d=B[type];if(d.near==null)return 1;const n=countNear(x,y,d.near,d.r);return n===0?0:Math.min(1,.4+n*.15)}
 const eff=b=>effAt(b.type,b.x,b.y);
-function mult(b,r){let m=1+.5*(b.level-1);if(S.tech.tools1&&(r==='wood'||r==='stone'))m*=1.2;if(S.tech.tools2)m*=1.3;if(S.tech.tools3)m*=1.25;if(hasRoad(b))m*=1.1;if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))m*=1+.25*PWR;if(S.story&&S.story.bless)m*=1.15;const hc=S.hero&&S.hero.c;if(hc==='thordis'&&r==='wood')m*=1.1;if(hc==='elmiran'&&r==='food')m*=1.15;if(hc==='zara'&&r==='research')m*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))m*=1.15;m*=.8+.4*happy().total;if(B[b.type].season&&(r==='food'||r==='grain'))m*=SEAS[seasonIdx()].food;return m}
+function mult(b,r){let m=1+.5*(b.level-1);if(S.tech.tools1&&(r==='wood'||r==='stone'))m*=1.2;if(S.tech.tools2)m*=1.3;if(S.tech.tools3)m*=1.25;if(hasRoad(b))m*=1.1;if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))m*=1+.25*PWR;if(S.story&&S.story.bless)m*=1.15;const hc=S.hero&&S.hero.c;if(hc==='thordis'&&r==='wood')m*=1.1;if(hc==='elmiran'&&r==='food')m*=1.15;if(hc==='zara'&&r==='research')m*=1.25;if(S.tech.agri2&&(r==='food'||r==='grain'))m*=1.25;if(S.tech.mining2&&(r==='stone'||r==='ore'))m*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))m*=1.15;m*=.8+.4*happy().total;if(B[b.type].season&&(r==='food'||r==='grain'))m*=SEAS[seasonIdx()].food;return m}
 const hasRoad=b=>[[1,0],[-1,0],[0,1],[0,-1]].some(([a,c])=>inMap(b.x+a,b.y+c)&&S.road[b.x+a+(b.y+c)*W]);
 function cap(r){if(r==='research'||r==='gold')return Infinity;let c=100;for(const b of S.buildings)if(B[b.type].cap&&!isSite(b))c+=B[b.type].cap*b.level;return c}
 function popCap(){let c=0;for(const b of S.buildings)c+=beds(b);return c}
@@ -423,14 +433,14 @@ function pay(c){for(const r in c)S.res[r]-=c[r]}
 function costHtml(c){return Object.keys(c).map(r=>`<span class="${(S.res[r]||0)>=c[r]?'':'miss'}">${RES[r].i} ${c[r]}</span>`).join('')}
 function upCost(b){
   const base=B[b.type].cost,L=b.level,c={};
-  for(const r in base)c[r]=Math.ceil(base[r]*Math.pow(1.6,L));
-  if(L>=2)c.planks=(c.planks||0)+10*L;
-  if(L>=3)c.iron=(c.iron||0)+5*(L-2);
-  if(L>=4)c.tools=(c.tools||0)+5;
-  if(L>=2)c.gold=15*L*(L-1);
+  for(const r in base)c[r]=Math.ceil(base[r]*Math.pow(1.9,L));
+  if(L>=2)c.planks=(c.planks||0)+20*L;
+  if(L>=3)c.iron=(c.iron||0)+10*(L-2);
+  if(L>=4)c.tools=(c.tools||0)+8*(L-3);
+  if(L>=2)c.gold=30*L*(L-1);
   return c;
 }
-function zoneCost(){const n=zonesCount(),c={wood:40*n,stone:25*n};if(n>=2)c.planks=20*(n-1);if(n>=4)c.iron=10*(n-3);if(n>=6)c.tools=8*(n-5);if(n>=2)c.gold=40*(n-1);return c}
+function zoneCost(){const n=zonesCount(),c={wood:80*n,stone:50*n};if(n>=2)c.planks=40*(n-1);if(n>=4)c.iron=20*(n-3);if(n>=6)c.tools=15*(n-5);if(n>=2)c.gold=100*(n-1);return c}
 function zoneAdj(z){const zx=z%ZN,zy=Math.floor(z/ZN);return [[1,0],[-1,0],[0,1],[0,-1]].some(([a,b])=>{const x=zx+a,y=zy+b;return x>=0&&y>=0&&x<ZN&&y<ZN&&S.zones[x+y*ZN]})}
 
 let liveTick=false,lastSea=-1;
@@ -439,6 +449,7 @@ function tick(dt,live){
   S.gt+=dt;
   econ(dt,true);
   marketTick(dt,live);
+  if(S.rs){S.rs.t-=dt*resSpeed();if(S.rs.t<=0){const k=S.rs.k;S.rs=null;S.tech[k]=1;gainXP(40);if(live){toast(`🔬 ${R[k].n} erforscht!`);checkGoals();if(sheetKind==='research'||sheetKind==='build')renderSheet()}}}
   familyTick(dt,live);
   selfBuildTick(dt,live);
   bankTick(dt,live);
@@ -1165,7 +1176,7 @@ const canRoad=(x,y)=>!isMarker(x,y)&&inMap(x,y)&&S.zones[zoneOf(x,y)]&&S.tiles[x
 function buildRoad(a,b){const line=[];let x=a.x,y=a.y;line.push([x,y]);while(x!==b.x){x+=Math.sign(b.x-x);line.push([x,y])}while(y!==b.y){y+=Math.sign(b.y-y);line.push([x,y])}
   let n=0,short=false;for(const [xx,yy] of line){if(!canRoad(xx,yy))continue;if(S.res.stone<1){short=true;break}S.res.stone-=1;S.road[xx+yy*W]=1;n++;dirtyAround(xx,yy)}
   if(n){pathGen++;save()}toast(n?`🛣️ ${n} Wegfeld${n>1?'er':''} gebaut${short?' – nicht genug Stein für alles':''}`:short?'Nicht genug Stein 🪨':'Hier ist kein Platz für einen Weg');checkGoals()}
-function refund(b){const c=B[b.type].cost||{},full=isSite(b)||!!(b.t&&Date.now()-b.t<120000),o={};for(const r in c)o[r]=full?c[r]:Math.floor(c[r]/2);return{o,full}}
+function refund(b){const c=b.pc||B[b.type].cost0||B[b.type].cost||{},full=isSite(b)||!!(b.t&&Date.now()-b.t<120000),o={};for(const r in c)o[r]=full?c[r]:Math.floor(c[r]/2);return{o,full}}
 function doDemolish(b){const rf=refund(b);for(const r in rf.o)addRes(r,rf.o[r]);if(b.up&&b.cs>0&&b.uc)for(const r in b.uc)addRes(r,b.uc[r]);if(S.hero&&S.hero.atSite===b.id)S.hero.atSite=null;for(const v of S.vill)if(v.job&&v.job.t==='b'&&v.job.id===b.id){v.job=null;v.tx=null}S.buildings=S.buildings.filter(x=>x!==b);dirtyAround(b.x,b.y);toast(`🗑️ ${B[b.type].n} abgerissen${rf.full?' – volle Rückerstattung':''}`);save()}
 function onTap(sx,sy){
   const tx=Math.floor((cam.x+sx/cam.z)/T),ty=Math.floor((cam.y+sy/cam.z)/T);
@@ -1228,12 +1239,14 @@ function sheetBuild(){
   return h;
 }
 function sheetResearch(){
-  let h=`<h3>🔬 Forschung</h3><p class="desc">Forschungspunkte: <b>${fmt(S.res.research)}</b> – erzeugt im Gelehrtenhaus.</p>`;
+  let h=`<h3>🔬 Forschung</h3><p class="desc">Forschungspunkte: <b>${fmt(S.res.research)}</b> – erzeugt im Gelehrtenhaus. Es läuft immer nur eine Forschung; jeder Gelehrte 🎓 beschleunigt sie um 5 % (aktuell ×${f1(resSpeed())}).</p>`;
+  if(S.rs){const r=R[S.rs.k];h+=`<div class="item" style="display:block;border:2px solid #7c6cf0"><b>${r.i} ${r.n} wird erforscht …</b>`+bar('Fortschritt',1-S.rs.t/S.rs.T)+`<p>⏳ Noch ${Math.ceil(S.rs.t/resSpeed()/60)} Min.</p><button class="sm" style="background:#a04a2a" data-act="rcancel">✖ Abbrechen (alles zurück)</button></div>`}
   for(const k in R){const r=R[k],done=S.tech[k],need=(r.need||[]).filter(n=>!S.tech[n]);
     let right;
     if(done)right='<b style="color:#4f8a2b">✔</b>';
     else if(need.length)right='';
-    else right=`<button class="sm" data-act="res:${k}" ${canPay(r.cost)&&(!r.edu||eduCount()>=r.edu)?'':'disabled'}>Erforschen</button>`;
+    else if(S.rs&&S.rs.k===k)right='<b>⏳</b>';
+    else right=`<button class="sm" data-act="res:${k}" ${!S.rs&&canPay(r.cost)&&(!r.edu||eduCount()>=r.edu)?'':'disabled'}>Erforschen<br><small>${Math.ceil(resTime(r)/resSpeed()/60)} Min.</small></button>`;
     h+=`<div class="item ${done?'done':need.length?'locked':''}"><div class="ic">${r.i}</div><div class="tx"><b>${r.n}</b><small>${r.desc}</small><div class="cost">${done?'Erforscht':need.length?'🔒 Benötigt: '+need.map(n=>R[n].n).join(', '):costHtml(r.cost)+(r.edu?`<span class="${eduCount()>=r.edu?'':'miss'}">🎓 ${eduCount()}/${r.edu} Gelehrte</span>`:'')}</div></div>${right}</div>`}
   return h;
 }
@@ -1328,8 +1341,8 @@ function sheetBuilding(b){
   }
   if(!d.fixed){
     if(b.cs>0){}
-    else if(b.level>=5)h+='<p class="note">⭐ Maximale Stufe erreicht.</p>';
-    else if(b.level>=mL)h+=`<p class="note">🔒 Höhere Stufen erst mit mehr Zonen (aktuell max. Stufe ${mL}).</p>`;
+    else if(b.level>=10)h+='<p class="note">⭐ Maximale Stufe erreicht.</p>';
+    else if(b.level>=mL)h+=`<p class="note">🔒 Max. Stufe ${mL}. ${b.level>=5&&!S.tech.arch1?'Stufe 6–7 braucht die Forschung „Baukunst“.':b.level>=7&&!S.tech.arch2?'Stufe 8–10 braucht „Meisterbaukunst“.':'Schalte mehr Zonen frei.'}</p>`;
     else{const c=upCost(b),bonus=b.type==='bank'?`Limit ${250*(b.level+1)*(b.level+1)} Gold`:b.type==='stall'?'+8 % bessere Preise':b.type==='house'?`+${beds(b,b.level+1)-beds(b)} Wohnplätze, neues Aussehen`:d.cap?`+${d.cap} Lagerplatz`:d.joy?`+${d.joy} Freude`:'+50 % Produktion, +1 Arbeitsplatz';
       h+=`<button class="big" data-act="up:${b.id}" ${canPay(c)?'':'disabled'}>⬆️ Ausbauen auf Stufe ${b.level+1} <small>(${bonus})</small><br><small class="c">${costHtml(c)}</small></button>`}
     const rf=refund(b);
@@ -1368,6 +1381,7 @@ function updateUI(){
   const idle=idleV().length;
   const nk=S.vill.length-adults();h+=`<div class="chip ${homeless()>0?'warn':''}"><span>👥</span><b>${adults()}/${popCap()}</b><small>${nk?'+'+nk+'🧒 ':''}${idle} frei</small></div>`;
   if(S.hero)h+=`<div class="chip click" data-act="hero"><span>${HEROES[S.hero.c].i}</span><b>${heroStatus()}</b></div>`;
+  if(S.rs)h+=`<div class="chip click" data-act="nav:research"><span>🔬</span><b>${Math.ceil(S.rs.t/resSpeed()/60)}m</b></div>`;
   const li=lvInfo();h+=`<div class="chip"><span>⭐</span><b>Lv ${li.L}</b><small>${Math.floor(li.x/li.n*100)}%</small></div>`;
   const Hp=happy(),dk=darkness();h+=`<div class="chip"><span>${moodI(Hp.total)}</span><b>${Math.round(Hp.total*100)}%</b></div><div class="chip"><span>${SEAS[seasonIdx()].i}</span><b>Tag ${dayNo()}</b><small>${dk>.35?'🌙':dk>0?'🌆':'☀️'}</small></div>`;
   $('chips').innerHTML=h;
@@ -1414,7 +1428,7 @@ function act(a,p){
       if(placing.move){const b=byId(placing.move);if(b){const ox=b.x,oy=b.y;b.x=placing.x;b.y=placing.y;dirtyAround(ox,oy);dirtyAround(b.x,b.y);toast(`↔️ ${d.n} verschoben`)}placing=null;updateBanner();save();break}
       if(!canPay(d.cost)){toast('Nicht genug Ressourcen');return}
       pay(d.cost);
-      const bt=buildTime(d.cost),b={id:S.nid++,type:placing.type,x:placing.x,y:placing.y,level:1,t:Date.now(),cs:bt,ct:bt,qs:Date.now()};S.buildings.push(b);dirtyAround(b.x,b.y);
+      const bt=buildTime(d.cost),b={id:S.nid++,type:placing.type,x:placing.x,y:placing.y,level:1,t:Date.now(),cs:bt,ct:bt,qs:Date.now(),pc:Object.assign({},d.cost)};S.buildings.push(b);dirtyAround(b.x,b.y);
       placing=null;updateBanner();
       if(S.hero&&S.hero.cmd!=='inv'){heroFree();S.hero.cmd='auto'}
       toast(`🚧 Baustelle ${d.i} ${d.n} – ${heroName().split(' ')[0]} baut (${Math.ceil(bt/bSpeed())} s)`);
@@ -1428,7 +1442,7 @@ function act(a,p){
     case 'sendall':sendGather(sheetArg.x,sheetArg.y,true);renderSheet();break;
     case 'recall':for(const v of S.vill)if(v.job&&v.job.t==='g'){if(v.carry){addRes(v.carry.r,v.carry.a);v.carry=null}v.job=null;v.tx=null}toast('Sammler kommen zurück');renderSheet();break;
     case 'unlock':{const z=+p,c=zoneCost();if(S.zones[z]||!zoneAdj(z)||!canPay(c)){toast('Nicht genug Ressourcen');return}pay(c);S.zones[z]=1;gainXP(100);drawAllTerrain();closeSheet();toast(`🔓 ${THEME_N[THEMES[z]]} freigeschaltet! Max. Ausbaustufe jetzt ${maxLevel()}`);checkGoals();save();break}
-    case 'res':{const r=R[p];if(S.tech[p]||!canPay(r.cost))return;if(r.edu&&eduCount()<r.edu){toast(`Benötigt ${r.edu} Gelehrte 🎓`);return}pay(r.cost);S.tech[p]=1;gainXP(40);toast(`🔬 ${r.n} erforscht!`);renderSheet();checkGoals();save();break}
+    case 'res':{const r=R[p];if(S.tech[p]||!canPay(r.cost))return;if(r.edu&&eduCount()<r.edu){toast(`Benötigt ${r.edu} Gelehrte 🎓`);return}if(S.rs){toast('Es läuft bereits eine Forschung');return}pay(r.cost);S.rs={k:p,t:resTime(r),T:resTime(r)};toast(`🔬 Forschung „${r.n}“ gestartet (${Math.ceil(resTime(r)/resSpeed()/60)} Min.)`);renderSheet();save();break;gainXP(40);toast(`🔬 ${r.n} erforscht!`);renderSheet();checkGoals();save();break}
     case 'openb':{const b=byId(+p);if(b){sel={x:b.x,y:b.y};openSheet('b',b.id);centerOn(b.x,b.y)}break}
     case 'export':{const s=btoa(unescape(encodeURIComponent(serialize())));
       const done=()=>toast('📋 Spielstand kopiert');
@@ -1454,6 +1468,7 @@ function act(a,p){
     case 'ucancel':{const b=byId(+p);if(b&&b.up&&b.cs>0){if(b.uc)for(const r in b.uc)addRes(r,b.uc[r]);delete b.cs;delete b.ct;delete b.up;delete b.uc;delete b.qs;toast('Ausbau abgebrochen – alles zurück');save()}renderSheet();break}
     case 'hgather':{const h=S.hero;if(!h)return;heroFree();h.cmd='gather';h.job={t:'g',x:sheetArg.x,y:sheetArg.y};h.ph='go';closeSheet();toast(`${HEROES[h.c].i} ${heroName().split(' ')[0]} geht sammeln`);break}
     case 'hinv':{const m=activeMarker();if(!m||!S.hero)return;heroFree();const h=S.hero;h.cmd='inv';h.inv={id:m.st.id,x:m.x,y:m.y};h.ph='go';closeSheet();toast(`🔍 ${heroName().split(' ')[0]} macht sich auf den Weg`);break}
+    case 'rcancel':{if(!S.rs)return;const r=R[S.rs.k];for(const x in r.cost)addRes(x,r.cost[x]);S.rs=null;toast('Forschung abgebrochen – alles zurück');renderSheet();break}
     case 'tax':S.tax=+p;toast(`💰 Steuern: ${TAX[S.tax].n}`);renderSheet();break;
     case 'selfb':S.selfBuild=S.selfBuild===false;toast(S.selfBuild?'🏠 Bewohner bauen jetzt selbst Häuser':'Selbstbau ausgeschaltet');renderSheet();break;
     case 'trade':openSheet('trade');break;
