@@ -131,6 +131,10 @@ const B={
   flowerbed:{n:'Blumenbeet',i:'🌷',roof:'#7fb35a',cost:{wood:5},joy:1,desc:'Schmuck fürs Dorf: +1 Freude pro Stufe.'},
   fountain:{n:'Brunnen',i:'⛲',roof:'#9fb8c8',cost:{stone:20,wood:5},joy:3,desc:'Treffpunkt der Bewohner: +3 Freude pro Stufe.'},
   market:{n:'Marktplatz',i:'🎪',roof:'#c9a46a',cost:{planks:20,stone:20,gold:30},joy:6,req:'market',desc:'Buntes Treiben: +6 Freude pro Stufe.'},
+  school:{n:'Schule',i:'🏫',roof:'#b85a3a',cost:{wood:40,stone:30,planks:20,gold:40},req:'schooling',desc:'Kinder lernen hier (6 Plätze pro Stufe). Wer mind. die halbe Kindheit zur Schule geht, wird erwachsen „gebildet“: +15 % Arbeitsleistung.'},
+  uni:{n:'Universität',i:'🎓',roof:'#6a3a8a',cost:{stone:80,planks:50,iron:20,gold:150},slots:2,req:'university',desc:'Gebildete studieren hier 1 Tag und werden „Gelehrte“: +30 % Leistung, im Gelehrtenhaus doppelt so viel Forschung. Gelehrte braucht man für moderne Forschung.'},
+  power:{n:'Kraftwerk',i:'⚡',roof:'#4a5a7a',cost:{stone:60,planks:40,iron:20,gold:80},slots:2,conv:{in:{wood:0.3},out:{}},req:'electricity',desc:'Verbrennt Holz zu Strom. Versorgt 8 Betriebe pro Stufe mit +25 % Produktion. Nachts leuchten Laternen an den Wegen.'},
+  garage:{n:'Fuhrhof',i:'🛻',roof:'#5a6a4a',cost:{planks:50,iron:30,tools:10,gold:150},slots:2,conv:{in:{tools:0.005},out:{}},req:'vehicles',desc:'Karren und Fuhrwerke: Alle Bewohner laufen 40 % schneller und tragen beim Sammeln 2 mehr. Verbraucht etwas Werkzeug.'},
   bank:{n:'Bank',i:'🏦',roof:'#6a7a8a',cost:{stone:40,planks:30,gold:50},req:'banking',desc:'Sparkonto, Festgeld und Kredite. Jede Stufe erhöht die maximale Anlagesumme.'},
   stall:{n:'Händlerstand',i:'🏪',roof:'#d08a3a',cost:{wood:20,stone:10},desc:'Hier verkaufst du Waren für Gold und kaufst ein. Jede Stufe: +8 % bessere Preise. Lockt den fahrenden Händler an.'},
   tavern:{n:'Taverne',i:'🍺',roof:'#8a4a2a',cost:{wood:30,stone:15},joy:4,req:'s_tavern',lockT:'🔒 Geschichte: Kapitel 1',desc:'Hildegards Taverne: +4 Freude pro Stufe. Hier werden Geschichten erzählt.'},
@@ -147,6 +151,10 @@ const R={
   fishing:{n:'Fischerei',i:'🎣',cost:{research:15},desc:'Schaltet die Fischerhütte frei (braucht Wasser).'},
   market:{n:'Handel',i:'🎪',cost:{research:45,gold:30},need:['sawmill'],desc:'+10 % bessere Marktpreise und schaltet den Marktplatz frei.'},
   milling:{n:'Müllerei',i:'🌬️',cost:{research:35,gold:40},need:['farm'],desc:'Schaltet Mühle und Bäckerei frei.'},
+  schooling:{n:'Schulwesen',i:'🏫',cost:{research:50,gold:40},need:['sawmill'],desc:'Schaltet die Schule frei.'},
+  university:{n:'Universität',i:'🎓',cost:{research:120,gold:120},need:['schooling'],desc:'Schaltet die Universität frei.'},
+  electricity:{n:'Elektrizität',i:'⚡',cost:{research:250,gold:250},need:['university'],edu:3,desc:'Schaltet das Kraftwerk frei: Strom für deine Betriebe.'},
+  vehicles:{n:'Fahrzeuge',i:'🛻',cost:{research:350,gold:350,tools:20},need:['electricity','smithing'],edu:5,desc:'Schaltet den Fuhrhof frei: schnellere Wege, mehr Transport.'},
   banking:{n:'Bankwesen',i:'🏦',cost:{research:60,gold:50},need:['market'],desc:'Schaltet die Bank frei: Zinsen auf dein Gold.'},
   smithing:{n:'Schmiedekunst',i:'⚒️',cost:{research:70,gold:70},need:['smelting'],desc:'Schaltet den Werkzeugschmied frei.'},
   tools3:{n:'Meisterwerkzeuge',i:'🛠️',cost:{research:120,tools:10,gold:150},need:['smithing','tools2'],desc:'+25 % auf alle Produktion.'}
@@ -171,6 +179,11 @@ const GOALS=[
   {t:'Baue 10 Wegfelder 🛣️',ok:()=>S.road.reduce((a,b)=>a+b,0)>=10},
   {t:'Baue einen Händlerstand 🏪',ok:()=>has('stall')},
   {t:'Verdiene 100 Gold 💰',ok:()=>(S.made.gold||0)>=100},
+  {t:'Ein Paar verliebt sich 💕',ok:()=>S.flags.love},
+  {t:'Das erste Baby wird geboren 👶',ok:()=>S.flags.baby},
+  {t:'Baue eine Schule 🏫',ok:()=>has('school')},
+  {t:'Bilde einen Gelehrten aus 🎓',ok:()=>eduCount()>=1},
+  {t:'Erforsche Elektrizität ⚡',ok:()=>S.tech.electricity},
   {t:'Lege Gold bei der Bank an 🏦',ok:()=>S.bank&&(S.bank.sav>0||S.bank.fixed.length>0)}
 ];
 const HEROES={
@@ -245,10 +258,14 @@ const SEAS=[
   {n:'Sommer',i:'☀️',grass:['#6a9e3a','#70a23d','#659936','#6c9f3b'],tree:['#2c6326','#30682a','#285c24'],hi:'#47873a',fl:1,water:'#3a80c4',food:1.2},
   {n:'Herbst',i:'🍂',grass:['#8a9a44','#93983f','#86933f','#8f9a48'],tree:['#c0602a','#d38a2e','#a8502a'],hi:'#e8b04a',fl:0,water:'#3a6fa8',food:1},
   {n:'Winter',i:'❄️',grass:['#dfe7ec','#e6edf1','#d9e2e8','#e2eaef'],tree:['#2a5a3a','#2e6040','#285436'],hi:'#f4f8fb',fl:0,water:'#a9cbe3',food:.6}];
-const NAMES=['Anna','Ben','Clara','David','Emma','Felix','Greta','Hans','Ida','Jakob','Klara','Lukas','Mia','Noah','Olga','Paul','Rosa','Simon','Tilda','Udo','Vera','Willi','Zoe','Moritz','Lina','Karl','Frieda','Oskar','Mathilda','Emil','Hedwig','Fritz','Lotte','Anton','Erna','Bruno','Marie','Theo','Luise','Gustav'];
+const NAMES_F=['Anna','Clara','Emma','Greta','Ida','Klara','Mia','Olga','Rosa','Tilda','Vera','Zoe','Lina','Frieda','Mathilda','Hedwig','Lotte','Erna','Marie','Luise','Paula','Ella','Johanna','Martha'];
+const NAMES_M=['Ben','David','Felix','Hans','Jakob','Lukas','Noah','Paul','Simon','Udo','Willi','Moritz','Karl','Oskar','Emil','Fritz','Anton','Bruno','Theo','Gustav','Max','Leo','Otto','Jonas'];
+const NAMES=NAMES_F.concat(NAMES_M);
+const GROW=3*720;
+let PWR=0,PWR_S=0,PWR_D=0,VEH=false;
 const TRAITS=['fleißig','verträumt','gesellig','mutig','gemütlich','neugierig','fröhlich','schüchtern'];
 const WORKTALK={woodcutter:'Holz! 🪓',quarry:'Stein um Stein ⛏️',gatherer:'Beeren! 🫐',scholar:'Hmm, interessant… 📜',sawmill:'Sägen, sägen 🪚',farm:'Das Korn wächst 🌾',mine:'Glück auf! ⛏️',smelter:'Heiß hier! 🔥',fisher:'Beißt einer an? 🎣',mill:'Die Flügel drehen sich 🌬️',bakery:'Frisches Brot! 🥖',toolsmith:'Klong, klong ⚒️'};
-const LIGHTS={tavern:1.4,monument:1.8,camp:2.2,house:1.3,bakery:1.3,smelter:1.4,toolsmith:1.3,market:1.5,scholar:1.2,fountain:1};
+const LIGHTS={power:1.5,school:1.2,uni:1.3,tavern:1.4,monument:1.8,camp:2.2,house:1.3,bakery:1.3,smelter:1.4,toolsmith:1.3,market:1.5,scholar:1.2,fountain:1};
 const CHIMNEY={tavern:1,camp:1,house:1,bakery:1,smelter:1,toolsmith:1};
 const SHIRTS=['#3b6fd1','#d14b3b','#e0a526','#7a4cc2','#2f9e8a','#d16fa8','#5b7d2a'];
 
@@ -347,11 +364,11 @@ function newGame(){
   S.buildings.push({id:S.nid++,type:'camp',x:21,y:21,level:1});
   spawnV(21.2,22.2); spawnV(21.9,22.3);
 }
-function persona(v){if(!v.name)v.name=NAMES[Math.floor(Math.random()*NAMES.length)];if(!v.trait)v.trait=TRAITS[Math.floor(Math.random()*TRAITS.length)];if(v.mo==null)v.mo=Math.round((Math.random()-.5)*16)/100}
+function persona(v){if(!v.name)v.name=NAMES[Math.floor(Math.random()*NAMES.length)];if(!v.g)v.g=NAMES_F.includes(v.name)?'f':NAMES_M.includes(v.name)?'m':(Math.random()<.5?'f':'m');if(v.edu==null)v.edu=0;if(!v.trait)v.trait=TRAITS[Math.floor(Math.random()*TRAITS.length)];if(v.mo==null)v.mo=Math.round((Math.random()-.5)*16)/100}
 function spawnV(x,y){const v={id:S.nid++,x,y,shirt:SHIRTS[Math.floor(Math.random()*SHIRTS.length)],job:null,ph:null,carry:null,slot:0};persona(v);S.vill.push(v)}
 function serialize(){
   S.time=Date.now();
-  const vill=S.vill.map(v=>({id:v.id,x:Math.round(v.x*100)/100,y:Math.round(v.y*100)/100,shirt:v.shirt,job:v.job,ph:v.ph,carry:v.carry,slot:v.slot,name:v.name,trait:v.trait,mo:v.mo}));
+  const vill=S.vill.map(v=>({id:v.id,x:Math.round(v.x*100)/100,y:Math.round(v.y*100)/100,shirt:v.shirt,job:v.job,ph:v.ph,carry:v.carry,slot:v.slot,name:v.name,trait:v.trait,mo:v.mo,g:v.g,kid:v.kid,age:v.age,edu:v.edu,partner:v.partner,par:v.par,sch:v.sch,study:v.study,home:v.home}));
   return JSON.stringify(Object.assign({},S,{vill,rt:S.rt.map(n=>Math.round(n))}));
 }
 function save(){try{localStorage.setItem(KEY,serialize())}catch(e){}}
@@ -370,17 +387,21 @@ const slots=b=>B[b.type].slots?B[b.type].slots+(b.level-1):0;
 function countNear(x,y,t,r){let n=0;for(let yy=y-r;yy<=y+r;yy++)for(let xx=x-r;xx<=x+r;xx++){if(inMap(xx,yy)&&S.tiles[xx+yy*W]===t&&Math.hypot(xx-x,yy-y)<=r+.5)n++}return n}
 function effAt(type,x,y){const d=B[type];if(d.near==null)return 1;const n=countNear(x,y,d.near,d.r);return n===0?0:Math.min(1,.4+n*.15)}
 const eff=b=>effAt(b.type,b.x,b.y);
-function mult(b,r){let m=1+.5*(b.level-1);if(S.tech.tools1&&(r==='wood'||r==='stone'))m*=1.2;if(S.tech.tools2)m*=1.3;if(S.tech.tools3)m*=1.25;if(hasRoad(b))m*=1.1;if(S.story&&S.story.bless)m*=1.15;const hc=S.hero&&S.hero.c;if(hc==='thordis'&&r==='wood')m*=1.1;if(hc==='elmiran'&&r==='food')m*=1.15;if(hc==='zara'&&r==='research')m*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))m*=1.15;m*=.8+.4*happy().total;if(B[b.type].season&&(r==='food'||r==='grain'))m*=SEAS[seasonIdx()].food;return m}
+function mult(b,r){let m=1+.5*(b.level-1);if(S.tech.tools1&&(r==='wood'||r==='stone'))m*=1.2;if(S.tech.tools2)m*=1.3;if(S.tech.tools3)m*=1.25;if(hasRoad(b))m*=1.1;if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))m*=1+.25*PWR;if(S.story&&S.story.bless)m*=1.15;const hc=S.hero&&S.hero.c;if(hc==='thordis'&&r==='wood')m*=1.1;if(hc==='elmiran'&&r==='food')m*=1.15;if(hc==='zara'&&r==='research')m*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))m*=1.15;m*=.8+.4*happy().total;if(B[b.type].season&&(r==='food'||r==='grain'))m*=SEAS[seasonIdx()].food;return m}
 const hasRoad=b=>[[1,0],[-1,0],[0,1],[0,-1]].some(([a,c])=>inMap(b.x+a,b.y+c)&&S.road[b.x+a+(b.y+c)*W]);
 function cap(r){if(r==='research'||r==='gold')return Infinity;let c=100;for(const b of S.buildings)if(B[b.type].cap&&!isSite(b))c+=B[b.type].cap*b.level;return c}
 function popCap(){let c=0;for(const b of S.buildings)c+=beds(b);return c}
 function econ(dt,apply){
   const d={},add=(r,a)=>d[r]=(d[r]||0)+a;
-  const cnt=workerCounts(), hf=S.res.food<=0.001?.5:1;
+  const cnt=workerCounts(), hf=S.res.food<=0.001?.5:1, pw={};
+  for(const v of S.vill)if(v.job&&v.job.t==='b'){const bb=byId(v.job.id);pw[v.job.id]=(pw[v.job.id]||0)+1+(v.edu===2?(bb&&bb.type==='scholar'?1:.3):v.edu===1?.15:0)}
+  {let sup=0,dem=0;for(const b of S.buildings){if(isSite(b))continue;const dd=B[b.type];if(b.type==='power'){const w=cnt[b.id]||0;if(w&&S.res.wood>1)sup+=8*b.level*Math.min(1,w/slots(b))}else if(dd.slots&&b.type!=='uni'&&b.type!=='garage')dem++}
+   PWR=dem?Math.min(1,sup/dem):0;PWR_S=sup;PWR_D=dem;
+   VEH=S.buildings.some(b=>b.type==='garage'&&!isSite(b)&&(cnt[b.id]||0)>0&&S.res.tools>.5)}
   for(const b of S.buildings){
     const def=B[b.type],w=cnt[b.id]||0;if(!w||isSite(b))continue;
     const e=eff(b);if(!e)continue;
-    const f=w*e*hf;
+    const f=(pw[b.id]||w)*e*hf;
     if(def.prod)for(const r in def.prod)add(r,def.prod[r]*mult(b,r)*f*dt);
     if(def.conv){
       const m=mult(b,null);let ratio=1;
@@ -416,10 +437,11 @@ function tick(dt,live){
   S.gt+=dt;
   econ(dt,true);
   marketTick(dt,live);
+  familyTick(dt,live);
   bankTick(dt,live);
   heroTick(dt,live);
   for(let i=0;i<S.rt.length;i++)if(S.rt[i]>0){S.rt[i]-=dt;if(S.rt[i]<=0){S.rt[i]=0;S.amt[i]=NODE[S.tiles[i]].max;dirtyTile(i)}}
-  if(S.vill.length<popCap()&&S.res.food>=5){
+  if(adults()<popCap()&&S.res.food>=5){
     S.spawnT+=dt;
     if(S.spawnT>=SPAWN_T){S.spawnT=0;const c=S.buildings[0];spawnV(c.x+.5+(Math.random()-.5),c.y+1.3);if(live)toast('👶 Ein neuer Bewohner ist eingezogen!')}
   }else S.spawnT=Math.min(S.spawnT,SPAWN_T);
@@ -696,6 +718,30 @@ function finishInv(id){
   dialog(lines,()=>advanceStep());
 }
 
+// ======================= FAMILIE & BILDUNG =======================
+const pickA=a=>a[Math.floor(Math.random()*a.length)];
+function familyTick(dt,live){
+  const Hp=happy();
+  const seats=S.buildings.filter(b=>b.type==='school'&&!isSite(b)).reduce((a,b)=>a+6*b.level,0);
+  let k=0;
+  for(const v of S.vill){if(!v.kid)continue;v.seat=k<seats;k++;v.age=(v.age||0)+dt;if(v.seat)v.sch=(v.sch||0)+dt;
+    if(v.age>=GROW){v.kid=0;v.tx=null;if((v.sch||0)>=GROW*.5){v.edu=1;if(live)toast(`🎒 ${v.name} ist erwachsen – mit Schulabschluss!`)}else if(live)toast(`🧑 ${v.name} ist erwachsen geworden!`)}}
+  for(const v of S.vill)if(v.job&&v.job.t==='b'){const b=byId(v.job.id);if(b&&b.type==='uni'&&!isSite(b)){v.study=(v.study||0)+dt*(1+.5*(b.level-1));if(v.study>=DAY){v.edu=2;v.study=0;v.job=null;v.tx=null;reslot(b);if(live)toast(`🎓 ${v.name} ist jetzt ${v.g==='f'?'Gelehrte':'Gelehrter'}!`)}}}
+  S.loveT=(S.loveT||0)+dt;
+  if(S.loveT>=90){S.loveT=0;const sg=S.vill.filter(v=>!v.kid&&!v.partner);
+    if(sg.length>=2&&Math.random()<.35*Hp.total+.05){const a=pickA(sg),rest=sg.filter(x=>x!==a),b=pickA(rest);a.partner=b.id;b.partner=a.id;b.home=a.home;S.flags.love=1;
+      if(live){toast(`💕 ${a.name} und ${b.name} haben sich verliebt!`);floatTxt(a.x,a.y,'💕');floatTxt(b.x,b.y,'💕')}}}
+  S.babyT=(S.babyT||0)+dt;
+  if(S.babyT>=120){S.babyT=0;
+    if(Hp.total>.5&&S.res.food>=20){const seen=new Set();
+      for(const v of S.vill.slice()){if(!v.partner||v.kid||seen.has(v.id))continue;const p=S.vill.find(x=>x.id===v.partner);if(!p){v.partner=null;continue}seen.add(v.id);seen.add(p.id);
+        if(S.vill.filter(c=>c.kid).length>=adults())break;
+        const kids=S.vill.filter(c=>c.par&&c.par.includes(v.id)).length;if(kids>=3||Math.random()>.15)continue;
+        const g=Math.random()<.5?'f':'m',nm=pickA(g==='f'?NAMES_F:NAMES_M);
+        const c={id:S.nid++,x:v.x,y:v.y+.3,shirt:SHIRTS[Math.floor(Math.random()*SHIRTS.length)],job:null,ph:null,carry:null,slot:0,name:nm,g,kid:1,age:0,edu:0,par:[v.id,p.id],home:v.home};
+        persona(c);S.vill.push(c);S.flags.baby=1;if(live){toast(`👶 ${v.name} und ${p.name} bekommen ein Baby: ${nm}!`);floatTxt(v.x,v.y,'👶')}}}}
+}
+
 // ======================= BEWOHNER =======================
 function nearestDrop(x,y){let best=null,bd=1e9;for(const b of S.buildings)if(B[b.type].store&&!isSite(b)){const d=Math.hypot(b.x+.5-x,b.y+.5-y);if(d<bd){bd=d;best=b}}return best}
 function tileCost(i){const t=S.tiles[i];if(t===WA)return Infinity;if(S.road[i])return .45;if(NODE[t])return S.amt[i]>0?2.2:1.2;return 1}
@@ -726,7 +772,7 @@ function walk(v,tx,ty,dt,sp){
   if(v.path&&v.path.length){if(moveTo(v,v.path[0].x,v.path[0].y,dt,sp))v.path.shift();return false}
   return moveTo(v,tx,ty,dt,sp);
 }
-function moveTo(v,tx,ty,dt,sp){const dx=tx-v.x,dy=ty-v.y,d=Math.hypot(dx,dy);let s=(sp||v.spd||SPEED)*dt;if(S.road[Math.floor(v.x)+Math.floor(v.y)*W])s*=1.8;if(d<=s){v.x=tx;v.y=ty;return true}v.x+=dx/d*s;v.y+=dy/d*s;return false}
+function moveTo(v,tx,ty,dt,sp){const dx=tx-v.x,dy=ty-v.y,d=Math.hypot(dx,dy);let s=(sp||v.spd||SPEED)*dt*(VEH?1.4:1)*(v.kid?.8:1);if(S.road[Math.floor(v.x)+Math.floor(v.y)*W])s*=1.8;if(d<=s){v.x=tx;v.y=ty;return true}v.x+=dx/d*s;v.y+=dy/d*s;return false}
 function findAlt(x,y,t){let best=null,bd=1e9;for(let yy=y-6;yy<=y+6;yy++)for(let xx=x-6;xx<=x+6;xx++){if(!inMap(xx,yy))continue;const i=xx+yy*W;if(S.tiles[i]!==t||S.amt[i]<=0||!S.zones[zoneOf(xx,yy)])continue;const d=Math.hypot(xx-x,yy-y);if(d<bd){bd=d;best={x:xx,y:yy}}}return best}
 function nextNode(v){const j=v.job,i=j.x+j.y*W;if(!NODE[S.tiles[i]]){v.job=null;v.tx=null;return}if(S.amt[i]>0){v.ph='go';return}const a=findAlt(j.x,j.y,S.tiles[i]);if(a){j.x=a.x;j.y=a.y;v.ph='go'}else{v.job=null;v.tx=null}}
 function updV(v,dt){
@@ -742,7 +788,7 @@ function updV(v,dt){
     }
     if(v.asleep){v.asleep=false;v.tx=null;v.wait=Math.random()*2}
     if(v.wait>0){v.wait-=dt;return}
-    if(v.tx==null){const hs=S.buildings.filter(b=>B[b.type].house),h=hs[Math.floor(Math.random()*hs.length)];v.tx=Math.max(.3,Math.min(W-.3,h.x+.5+(Math.random()-.5)*3));v.ty=Math.max(.3,Math.min(H-.3,h.y+.5+(Math.random()-.5)*3))}
+    if(v.tx==null){const sc=v.kid&&v.seat&&S.buildings.find(b=>b.type==='school'&&!isSite(b)),hs=S.buildings.filter(b=>B[b.type].house&&!isSite(b)),hp=v.home&&byId(v.home),h=sc||(hp&&B[hp.type].house?hp:hs[Math.floor(Math.random()*hs.length)]);v.tx=Math.max(.3,Math.min(W-.3,h.x+.5+(Math.random()-.5)*3));v.ty=Math.max(.3,Math.min(H-.3,h.y+.5+(Math.random()-.5)*3))}
     if(walk(v,v.tx,v.ty,dt,SPEED*.5)){v.tx=null;v.wait=1+Math.random()*3}
     return;
   }
@@ -770,7 +816,7 @@ function updV(v,dt){
     v.working=true;v.wait-=dt;
     if(v.wait<=0){
       const nd=NODE[S.tiles[i]];
-      if(nd&&S.amt[i]>0){const a=Math.min(S.amt[i],nd.y+(S.tech.tools1?1:0)+(v.hero&&S.hero.c==='thordis'?2:0));S.amt[i]-=a;if(S.amt[i]<=0){S.amt[i]=0;S.rt[i]=nd.rg;dirtyTile(i)}v.carry={r:nd.r,a}}
+      if(nd&&S.amt[i]>0){const a=Math.min(S.amt[i],nd.y+(S.tech.tools1?1:0)+(v.hero&&S.hero.c==='thordis'?2:0)+(VEH?2:0));S.amt[i]-=a;if(S.amt[i]<=0){S.amt[i]=0;S.rt[i]=nd.rg;dirtyTile(i)}v.carry={r:nd.r,a}}
       v.ph='back';
     }
     return;
@@ -780,7 +826,10 @@ function updV(v,dt){
     if(S.amt[i]>0){v.ph='work';v.wait=2.5}else nextNode(v);
   }
 }
-const idleV=()=>S.vill.filter(v=>!v.job);
+const idleV=()=>S.vill.filter(v=>!v.job&&!v.kid);
+const adults=()=>S.vill.filter(v=>!v.kid).length;
+const eduCount=()=>S.vill.filter(v=>v.edu===2).length;
+const eduName=e=>e===2?'🎓 Gelehrt':e===1?'🎒 Schulabschluss':'Keine';
 function sendGather(x,y,all){
   const idle=idleV();
   if(!idle.length){toast('Kein freier Bewohner. Baue ein Haus oder ziehe Arbeiter ab.');return}
@@ -793,7 +842,8 @@ function reslot(b){let k=0;for(const v of S.vill)if(v.job&&v.job.t==='b'&&v.job.
 function addWorker(b,quiet){
   if(isSite(b)){if(!quiet)toast('🚧 Noch im Bau');return false}
   if(wcount(b)>=slots(b)){if(!quiet)toast('Alle Arbeitsplätze belegt – baue das Gebäude aus.');return false}
-  const idle=idleV();
+  let idle=idleV();
+  if(b.type==='uni'){idle=idle.filter(v=>v.edu===1);if(!idle.length){if(!quiet)toast('Kein freier Bewohner mit Schulabschluss 🎒');return false}}
   if(!idle.length){if(!quiet)toast('Kein freier Bewohner. Baue ein Haus oder rufe Sammler zurück.');return false}
   idle.sort((a,c)=>Math.hypot(a.x-b.x,a.y-b.y)-Math.hypot(c.x-b.x,c.y-b.y));
   idle[0].job={t:'b',id:b.id};reslot(b);return true;
@@ -898,6 +948,10 @@ function drawBuilding(b,cnt){
 }
 function drawV(v){
   const px=v.x*T,py=v.y*T+(v.working?Math.sin(v.anim*12)*1.2:0);
+  if(v.kid){ctx.save();ctx.translate(px,py);ctx.scale(.65,.65);ctx.translate(-px,-py);drawV2(v,px,py);ctx.restore();return}
+  drawV2(v,px,py);
+}
+function drawV2(v,px,py){
   ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(px+1.5,py+2.5,4.5,3,0,0,7);ctx.fill();
   ctx.fillStyle=v.shirt;ctx.beginPath();ctx.arc(px,py,4.5,0,7);ctx.fill();
   ctx.strokeStyle='rgba(0,0,0,.45)';ctx.lineWidth=.8;ctx.stroke();
@@ -917,7 +971,11 @@ function thought(v){
   if(v.job&&v.job.t==='i')o.push('Was mag hier verborgen sein? 🔍','Ein seltsamer Ort …');
   if(S.story.ch>0&&!v.job)o.push('Hast du von Eichenhall gehört?','Karak ist ein seltsamer Kauz …','Der Halbmond … was bedeutet er?');
   if(v.job&&v.job.t==='b'){const b=byId(v.job.id);if(b)o.push(WORKTALK[b.type]||'Fleißig, fleißig!')}
+  if(v.kid)return pickA(v.seat?['Schule macht Spaß! 📚','Ich will spielen! ⚽','Wann ist Pause?']:['Ich will spielen! ⚽','Fangen spielen! 🏃','Mama, Papa! 👪']);
   if(!v.job)o.push('Ich hätte gern Arbeit.','Was mach ich heute?','Schöner Tag zum Spazieren.');
+  if(v.partner){const pt=S.vill.find(x=>x.id===v.partner);if(pt)o.push(`Ich denke an ${pt.name} 💕`)}
+  if(v.edu===2)o.push('Wissen ist Macht 🎓');
+  if(PWR>0)o.push('Strom ist ein Wunder! ⚡');if(VEH)o.push('Mit dem Karren geht’s schneller! 🛻');
   if(Hp.joy<.3)o.push('Hier ist es etwas trist…','Ein Brunnen wäre schön ⛲');
   if(Hp.total>.75)o.push('Ich liebe dieses Dorf! 😊','Schönes Leben hier!');
   if(S.vill.length>=popCap())o.push('Es wird eng hier… 🏠');
@@ -972,6 +1030,8 @@ function render(dt){
     ctx.globalCompositeOperation='lighter';const tt=performance.now()/1000;
     for(const b of S.buildings){const L=LIGHTS[b.type];if(!L||isSite(b)||!vis(b.x,b.y))continue;const cx=(b.x+.5)*T,cy=(b.y+.5)*T,rad=T*L*(b.type==='camp'?1+.06*Math.sin(tt*9):1);
       const g=ctx.createRadialGradient(cx,cy,2,cx,cy,rad);g.addColorStop(0,`rgba(255,170,80,${dk*.75})`);g.addColorStop(1,'rgba(255,170,80,0)');ctx.fillStyle=g;ctx.fillRect(cx-rad,cy-rad,rad*2,rad*2)}
+    if(PWR>0){const x0=Math.max(0,Math.floor(vx0/T)),x1=Math.min(W-1,Math.ceil(vx1/T)),y0=Math.max(0,Math.floor(vy0/T)),y1=Math.min(H-1,Math.ceil(vy1/T));
+      for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){if(!S.road[x+y*W]||(x+y)%3)continue;const cx=(x+.5)*T,cy=(y+.5)*T,g=ctx.createRadialGradient(cx,cy,1,cx,cy,T*.9);g.addColorStop(0,`rgba(255,230,150,${dk*.6})`);g.addColorStop(1,'rgba(255,230,150,0)');ctx.fillStyle=g;ctx.fillRect(cx-T,cy-T,T*2,T*2)}}
     ctx.globalCompositeOperation='source-over';
     const sl={};for(const v of S.vill)if(v.asleep&&v.home)sl[v.home]=1;
     ctx.fillStyle=`rgba(255,215,110,${Math.min(1,dk*1.8)})`;
@@ -1108,16 +1168,23 @@ function sheetResearch(){
     let right;
     if(done)right='<b style="color:#4f8a2b">✔</b>';
     else if(need.length)right='';
-    else right=`<button class="sm" data-act="res:${k}" ${canPay(r.cost)?'':'disabled'}>Erforschen</button>`;
-    h+=`<div class="item ${done?'done':need.length?'locked':''}"><div class="ic">${r.i}</div><div class="tx"><b>${r.n}</b><small>${r.desc}</small><div class="cost">${done?'Erforscht':need.length?'🔒 Benötigt: '+need.map(n=>R[n].n).join(', '):costHtml(r.cost)}</div></div>${right}</div>`}
+    else right=`<button class="sm" data-act="res:${k}" ${canPay(r.cost)&&(!r.edu||eduCount()>=r.edu)?'':'disabled'}>Erforschen</button>`;
+    h+=`<div class="item ${done?'done':need.length?'locked':''}"><div class="ic">${r.i}</div><div class="tx"><b>${r.n}</b><small>${r.desc}</small><div class="cost">${done?'Erforscht':need.length?'🔒 Benötigt: '+need.map(n=>R[n].n).join(', '):costHtml(r.cost)+(r.edu?`<span class="${eduCount()>=r.edu?'':'miss'}">🎓 ${eduCount()}/${r.edu} Gelehrte</span>`:'')}</div></div>${right}</div>`}
   return h;
 }
-function jobText(v){if(v.asleep)return '😴 Schläft';if(!v.job)return '🚶 Hat gerade frei';if(v.job.t==='i')return '🔍 Untersucht einen geheimnisvollen Ort';if(v.job.t==='g'){const nd=NODE[S.tiles[v.job.x+v.job.y*W]];return '🧺 Sammelt '+(nd?RES[nd.r].n:'')}const b=byId(v.job.id);return b?'👷 Arbeitet: '+B[b.type].i+' '+B[b.type].n:'—'}
+function jobText(v){if(v.asleep)return '😴 Schläft';if(v.kid)return v.seat?'🏫 Schulkind':'🧒 Spielt';if(!v.job)return '🚶 Hat gerade frei';if(v.job.t==='i')return '🔍 Untersucht einen geheimnisvollen Ort';if(v.job.t==='g'){const nd=NODE[S.tiles[v.job.x+v.job.y*W]];return '🧺 Sammelt '+(nd?RES[nd.r].n:'')}const b=byId(v.job.id);return b?'👷 Arbeitet: '+B[b.type].i+' '+B[b.type].n:'—'}
 const bar=(l,v)=>`<div class="bar"><span>${l}</span><div><i style="width:${Math.round(Math.max(0,Math.min(1,v))*100)}%"></i></div><b>${Math.round(Math.max(0,Math.min(1,v))*100)} %</b></div>`;
 function sheetV(v){
   const Hp=happy(),m=Math.max(0,Math.min(1,Hp.total+v.mo));
   if(!v.th)v.th=thought(v);
-  let h=`<h3>${moodI(m)} ${v.name}</h3><p class="desc">Ist ${v.trait}.</p><p>${jobText(v)}</p>`;
+  let h=`<h3>${moodI(m)} ${v.name}${v.kid?' 👶':''}</h3><p class="desc">Ist ${v.trait}.</p><p>${jobText(v)}</p>`;
+  const pt=v.partner&&S.vill.find(x=>x.id===v.partner),kids=S.vill.filter(c=>c.par&&c.par.includes(v.id)),par=v.par?v.par.map(id=>S.vill.find(x=>x.id===id)).filter(Boolean):[];
+  if(pt)h+=`<p>💕 Partner: <b>${pt.name}</b></p>`;
+  if(kids.length)h+=`<p>👶 Kinder: ${kids.map(c=>c.name).join(', ')}</p>`;
+  if(par.length)h+=`<p>👪 Eltern: ${par.map(x=>x.name).join(' & ')}</p>`;
+  if(v.kid)h+=`<p>🧒 Wird erwachsen in ca. ${Math.ceil((GROW-(v.age||0))/60)} Min. · ${v.seat?'🏫 geht zur Schule':'keine Schule – kein Platz'}</p>`+bar('📚 Schulzeit',(v.sch||0)/(GROW*.5));
+  else h+=`<p>Bildung: <b>${eduName(v.edu)}</b></p>`;
+  if(v.job&&v.job.t==='b'&&byId(v.job.id)&&byId(v.job.id).type==='uni')h+=bar('🎓 Studium',(v.study||0)/DAY);
   h+=bar('😊 Laune',m)+bar('🍎 Nahrung',Hp.food)+bar('🏠 Wohnen',Hp.home)+bar('🎉 Freude',Hp.joy);
   h+=`<div class="thought">💭 „${v.th}“</div>`;
   if(v.job)h+=`<button class="danger" data-act="vfree:${v.id}">Arbeit beenden (wird frei)</button>`;
@@ -1126,9 +1193,11 @@ function sheetV(v){
 function sheetVillage(){
   const pop=S.vill.length,pc=popCap(),idle=idleV().length,g=S.vill.filter(v=>v.job&&v.job.t==='g').length,w=pop-idle-g;
   const fr=econ(60,false).food||0;
-  let h=`<h3>👥 Dorf</h3><p>Bewohner: <b>${pop}</b> / ${pc} Wohnplätze</p><p>😴 Frei: <b>${idle}</b> · 👷 In Gebäuden: <b>${w}</b> · 🧺 Sammler: <b>${g}</b></p>`;
+  let h=`<h3>👥 Dorf</h3><p>Erwachsene: <b>${adults()}</b> / ${pc} Wohnplätze${pop>adults()?` · Kinder: <b>${pop-adults()}</b> (schlafen bei den Eltern)`:''}</p><p>😴 Frei: <b>${idle}</b> · 👷 In Gebäuden: <b>${w}</b> · 🧺 Sammler: <b>${g}</b></p>`;
+  const ns=S.vill.filter(v=>v.kid).length,pr=S.vill.filter(v=>v.partner&&!v.kid).length/2;
+  h+=`<p>💕 Paare: <b>${Math.floor(pr)}</b> · 🧒 Kinder: <b>${ns}</b> · 🎒 Gebildet: <b>${S.vill.filter(v=>v.edu===1).length}</b> · 🎓 Gelehrte: <b>${eduCount()}</b></p>`;
   h+=`<p>🍎 Nahrung: <b class="${fr<0?'miss':''}">${fr>=0?'+':'−'}${f1(fr)}/Min</b> (jeder Bewohner isst ${f1(FOOD_PER*60)}/Min)</p>`;
-  if(pop>=pc)h+='<p class="note">Das Dorf ist voll – baue Häuser für neue Bewohner.</p>';
+  if(adults()>=pc)h+='<p class="note">Das Dorf ist voll – baue Häuser für neue Bewohner.</p>';
   else if(S.res.food<5)h+='<p class="note">Neue Bewohner kommen nur, wenn genug Nahrung (5+) da ist.</p>';
   else h+=`<p class="desc">Nächster Bewohner in ca. ${Math.ceil(SPAWN_T-S.spawnT)} s.</p>`;
   const Hp=happy(),SE=SEAS[seasonIdx()];
@@ -1166,6 +1235,10 @@ function sheetBuilding(b){
     h+='</div>';
     if(isSite(b))return h+`<button class="danger" data-act="demo:${b.id}">${demoConfirm===b.id?'⚠️ Sicher? Nochmal tippen':'✖ Baustelle abbrechen (alles zurück)'}</button>`;
   }
+  if(b.type==='school'&&!isSite(b)){const n=S.vill.filter(v=>v.kid).length;h+=`<p>🏫 Plätze: ${S.buildings.filter(x=>x.type==='school'&&!isSite(x)).reduce((a,x)=>a+6*x.level,0)} · Kinder im Dorf: ${n}</p>`}
+  if(b.type==='power'&&!isSite(b))h+=`<p>⚡ Strom: ${Math.round(PWR_S)} für ${PWR_D} Betriebe → +${Math.round(PWR*25)} % Produktion</p>`;
+  if(b.type==='garage'&&!isSite(b))h+=`<p>🛻 ${VEH?'Fuhrwerke unterwegs: +40 % Tempo, +2 beim Sammeln':'Steht still – braucht Arbeiter und Werkzeug'}</p>`;
+  if(b.type==='uni'&&!isSite(b))h+='<p class="desc">Nur Bewohner mit Schulabschluss 🎒 können studieren. Nach dem Studium werden sie automatisch frei.</p>';
   if(b.type==='bank'&&!isSite(b))h+=`<p>🏦 Limit: ${bankCap()} Gold · Kredit bis ${loanMax()}</p><button class="big" style="background:#6a7a8a" data-act="bank">🏦 Zur Bank</button>`;
   if(b.type==='stall'&&!isSite(b))h+=`<p>💹 Preisbonus: ×${f1(tradeBonus())}</p><button class="big" style="background:#b5893a" data-act="trade">💰 Zum Markt</button>`;
   if(d.house)h+=`<p>🛏️ Wohnplätze: <b>${beds(b)}</b></p>`;
@@ -1222,7 +1295,7 @@ function updateUI(){
   for(const r in RES){if(!show[r])continue;const v=S.res[r],d=rt[r]||0,full=v>=cap(r)-.01;
     h+=`<div class="chip ${full?'full':''} ${r==='food'&&v<=0.001?'warn':''} ${r==='gold'&&has('stall')?'click':''}" ${r==='gold'&&has('stall')?'data-act="trade"':''}><span>${RES[r].i}</span><b>${fmt(v)}</b>${Math.abs(d)>=.05?`<small class="${d<0?'neg':''}">${d>0?'+':'−'}${f1(d)}/m</small>`:''}</div>`}
   const idle=idleV().length;
-  h+=`<div class="chip"><span>👥</span><b>${S.vill.length}/${popCap()}</b><small>${idle} frei</small></div>`;
+  const nk=S.vill.length-adults();h+=`<div class="chip"><span>👥</span><b>${adults()}/${popCap()}</b><small>${nk?'+'+nk+'🧒 ':''}${idle} frei</small></div>`;
   if(S.hero)h+=`<div class="chip click" data-act="hero"><span>${HEROES[S.hero.c].i}</span><b>${heroStatus()}</b></div>`;
   const li=lvInfo();h+=`<div class="chip"><span>⭐</span><b>Lv ${li.L}</b><small>${Math.floor(li.x/li.n*100)}%</small></div>`;
   const Hp=happy(),dk=darkness();h+=`<div class="chip"><span>${moodI(Hp.total)}</span><b>${Math.round(Hp.total*100)}%</b></div><div class="chip"><span>${SEAS[seasonIdx()].i}</span><b>Tag ${dayNo()}</b><small>${dk>.35?'🌙':dk>0?'🌆':'☀️'}</small></div>`;
@@ -1284,7 +1357,7 @@ function act(a,p){
     case 'sendall':sendGather(sheetArg.x,sheetArg.y,true);renderSheet();break;
     case 'recall':for(const v of S.vill)if(v.job&&v.job.t==='g'){if(v.carry){addRes(v.carry.r,v.carry.a);v.carry=null}v.job=null;v.tx=null}toast('Sammler kommen zurück');renderSheet();break;
     case 'unlock':{const z=+p,c=zoneCost();if(S.zones[z]||!zoneAdj(z)||!canPay(c)){toast('Nicht genug Ressourcen');return}pay(c);S.zones[z]=1;gainXP(100);drawAllTerrain();closeSheet();toast(`🔓 ${THEME_N[THEMES[z]]} freigeschaltet! Max. Ausbaustufe jetzt ${maxLevel()}`);checkGoals();save();break}
-    case 'res':{const r=R[p];if(S.tech[p]||!canPay(r.cost))return;pay(r.cost);S.tech[p]=1;gainXP(40);toast(`🔬 ${r.n} erforscht!`);renderSheet();checkGoals();save();break}
+    case 'res':{const r=R[p];if(S.tech[p]||!canPay(r.cost))return;if(r.edu&&eduCount()<r.edu){toast(`Benötigt ${r.edu} Gelehrte 🎓`);return}pay(r.cost);S.tech[p]=1;gainXP(40);toast(`🔬 ${r.n} erforscht!`);renderSheet();checkGoals();save();break}
     case 'openb':{const b=byId(+p);if(b){sel={x:b.x,y:b.y};openSheet('b',b.id);centerOn(b.x,b.y)}break}
     case 'export':{const s=btoa(unescape(encodeURIComponent(serialize())));
       const done=()=>toast('📋 Spielstand kopiert');
