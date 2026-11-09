@@ -285,7 +285,7 @@ const buildTime=c=>Math.round(Math.min(120,6+.35*sumC(c)));
 const upTime=c=>Math.round(Math.min(180,8+.25*sumC(c)));
 const bSpeed=()=>S.hero&&S.hero.c==='brunolf'?1.35:1;
 const heroName=()=>S.hero?HEROES[S.hero.c].n:'Held';
-function nextSite(){let best=null;for(const b of S.buildings)if(b.cs>0&&(!best||(b.qs||0)<(best.qs||0)))best=b;return best}
+function nextSite(){let best=null;for(const b of S.buildings)if(b.cs>0&&!b.self&&(!best||(b.qs||0)<(best.qs||0)))best=b;return best}
 const zonesCount=()=>S.zones.filter(Boolean).length;
 const maxLevel=()=>Math.min(5,zonesCount()+1);
 const beds=(b,L)=>isSite(b)?0:b.type==='house'?HOUSE_BEDS[(L||b.level)-1]:b.type==='camp'?2:0;
@@ -297,7 +297,7 @@ const isNight=()=>darkness()>.35;
 function happy(){
   const pop=Math.max(1,S.vill.length),food=S.res.food>0.001?1:0;
   const hs=S.buildings.filter(b=>b.type==='house'&&!isSite(b));
-  const home=hs.length?Math.min(1,.3+.175*hs.reduce((a,b)=>a+b.level,0)/hs.length):.3;
+  const home=(hs.length?Math.min(1,.3+.175*hs.reduce((a,b)=>a+b.level,0)/hs.length):.3)*Math.min(1,popCap()/Math.max(1,adults()));
   let jp=0;for(const b of S.buildings)if(B[b.type].joy&&!isSite(b))jp+=B[b.type].joy*b.level;
   if(seasonIdx()===3)jp+=5;
   const joy=Math.min(1,jp*2/pop*(S.hero&&S.hero.c==='lyonessa'?1.5:1));
@@ -439,6 +439,7 @@ function tick(dt,live){
   econ(dt,true);
   marketTick(dt,live);
   familyTick(dt,live);
+  selfBuildTick(dt,live);
   bankTick(dt,live);
   heroTick(dt,live);
   for(let i=0;i<S.rt.length;i++)if(S.rt[i]>0){S.rt[i]-=dt;if(S.rt[i]<=0){S.rt[i]=0;S.amt[i]=NODE[S.tiles[i]].max;dirtyTile(i)}}
@@ -609,7 +610,7 @@ function drawHero(){
   if(h.flag){ctx.font='12px sans-serif';ctx.fillText('🚩',(h.flag.x+.55)*T,(h.flag.y+.35)*T)}
 }
 function sheetHero(){
-  const h=S.hero,H_=HEROES[h.c],sites=S.buildings.filter(b=>b.cs>0).sort((a,b)=>(a.qs||0)-(b.qs||0));
+  const h=S.hero,H_=HEROES[h.c],sites=S.buildings.filter(b=>b.cs>0&&!b.self).sort((a,b)=>(a.qs||0)-(b.qs||0));
   let x=`<h3>${H_.i} ${H_.n}</h3><p class="desc">${H_.v} – ${H_.d}</p><p>✨ Bonus: <b>${H_.b}</b></p><p>Status: <b>${heroStatus()}</b></p>`;
   x+=`<p style="margin-top:10px"><b>🚧 Baustellen (${sites.length})</b></p>`;
   if(!sites.length)x+='<p class="desc">Keine Baustellen. Neue Gebäude und Ausbauten baut deine Hauptfigur selbst.</p>';
@@ -736,11 +737,45 @@ function familyTick(dt,live){
   if(S.babyT>=120){S.babyT=0;
     if(Hp.total>.5&&S.res.food>=20){const seen=new Set();
       for(const v of S.vill.slice()){if(!v.partner||v.kid||seen.has(v.id))continue;const p=S.vill.find(x=>x.id===v.partner);if(!p){v.partner=null;continue}seen.add(v.id);seen.add(p.id);
-        if(S.vill.filter(c=>c.kid).length>=adults())break;
+        if(S.vill.length>=popCap())break;
         const kids=S.vill.filter(c=>c.par&&c.par.includes(v.id)).length;if(kids>=3||Math.random()>.15)continue;
         const g=Math.random()<.5?'f':'m',nm=pickA(g==='f'?NAMES_F:NAMES_M);
         const c={id:S.nid++,x:v.x,y:v.y+.3,shirt:SHIRTS[Math.floor(Math.random()*SHIRTS.length)],job:null,ph:null,carry:null,slot:0,name:nm,g,kid:1,age:0,edu:0,par:[v.id,p.id],home:v.home};
         persona(c);S.vill.push(c);S.flags.baby=1;if(live){toast(`👶 ${v.name} und ${p.name} bekommen ein Baby: ${nm}!`);floatTxt(v.x,v.y,'👶')}}}}
+}
+
+// ======================= SELBSTBAU & WOHNRAUM =======================
+const pendingBeds=()=>S.buildings.filter(b=>b.type==='house'&&isSite(b)).length*2;
+const homeless=()=>Math.max(0,adults()-popCap());
+const hasRoadAt=(x,y)=>[[1,0],[-1,0],[0,1],[0,-1]].some(([a,c])=>inMap(x+a,y+c)&&S.road[x+a+(y+c)*W]);
+function freeSpot(){
+  const bs=S.buildings.filter(b=>!isSite(b));let cx=0,cy=0;bs.forEach(b=>{cx+=b.x;cy+=b.y});cx/=bs.length;cy/=bs.length;
+  let best=null,bd=1e9;for(let y=Math.floor(cy)-10;y<=cy+10;y++)for(let x=Math.floor(cx)-10;x<=cx+10;x++){if(!inMap(x,y)||!validPlace(x,y)||(xmas&&xmas.x===x&&xmas.y===y))continue;const d=Math.hypot(x-cx,y-cy)+(hasRoadAt(x,y)?-1.5:0);if(d<bd){bd=d;best={x,y}}}
+  return best;
+}
+function selfBuildTick(dt,live){
+  if(S.selfBuild==null)S.selfBuild=true;
+  const need=homeless()-pendingBeds(),cost=B.house.cost;
+  S.sbT=(S.sbT||0)+dt;
+  if(S.sbT>=15){S.sbT=0;
+    const active=S.buildings.filter(b=>b.self&&b.cs>0).length;
+    if(S.selfBuild&&need>0&&active<3&&canPay(cost)){const p=freeSpot();if(p){pay(cost);const bt=buildTime(cost);S.buildings.push({id:S.nid++,type:'house',x:p.x,y:p.y,level:1,cs:bt,ct:bt,self:1,qs:Date.now()});dirtyAround(p.x,p.y);if(live)toast('🏠 Die Bewohner fangen an, sich selbst ein Haus zu bauen!')}}
+  }
+  for(const b of S.buildings){if(!b.self||!(b.cs>0))continue;
+    let hs=S.vill.filter(v=>v.job&&v.job.t==='c'&&v.job.id===b.id);
+    if(hs.length<3){const idle=idleV().sort((a,c)=>Math.hypot(a.x-b.x,a.y-b.y)-Math.hypot(c.x-b.x,c.y-b.y));for(const v of idle.slice(0,3-hs.length)){v.job={t:'c',id:b.id};v.tx=null;v.atC=false}hs=S.vill.filter(v=>v.job&&v.job.t==='c'&&v.job.id===b.id)}
+    const n=live?hs.filter(v=>v.atC).length:hs.length;
+    if(n){b.cs-=dt*.5*n;if(b.cs<=0){b.cs=0;completeSite(b,false);for(const v of hs){v.job=null;v.tx=null;v.atC=false}if(live){toast('🏠 Die Bewohner haben selbst ein Haus gebaut!');checkGoals()}}}
+  }
+  S.emT=(S.emT||0)+dt;
+  if(homeless()>0&&!(S.selfBuild&&canPay(cost))){
+    if(S.emT>=120){S.emT=0;
+      const parents=new Set();S.vill.forEach(c=>{if(c.par)c.par.forEach(id=>parents.add(id))});
+      const cand=S.vill.filter(v=>!v.kid&&!v.job&&!v.partner&&!parents.has(v.id));
+      const pool=cand.length?cand:S.vill.filter(v=>!v.kid&&!v.job);
+      const v=pool.length?pool[Math.floor(Math.random()*pool.length)]:S.vill.find(x=>!x.kid&&(!x.job||x.job.t!=='b'));
+      if(v){if(v.partner){const pt=S.vill.find(x=>x.id===v.partner);if(pt)pt.partner=null}S.vill=S.vill.filter(x=>x!==v);if(live)toast(`🚶 ${v.name} hat das Dorf verlassen – kein Wohnraum.`)}}
+  }else S.emT=Math.min(S.emT,60);
 }
 
 // ======================= BEWOHNER =======================
@@ -799,6 +834,7 @@ function updV(v,dt){
     v.working=walk(v,b.x+.5+Math.cos(a)*.62,b.y+.5+Math.sin(a)*.62,dt);
     return;
   }
+  if(j.t==='c'){const b=byId(j.id);if(!b||!(b.cs>0)){v.job=null;v.atC=false;return}const a=(v.id*2.3)%6.28;if(walk(v,b.x+.5+Math.cos(a)*.6,b.y+.5+Math.sin(a)*.6,dt)){v.atC=true;v.working=true}return}
   if(j.t==='i'){
     if(v.ph==='work'){v.working=true;v.wait-=dt;if(v.wait<=0){v.job=null;v.tx=null;finishInv(j.id)}return}
     if(walk(v,j.x+.5,j.y+.85,dt)){const st=curStep();v.ph='work';v.wait=(st&&st.w)||6}
@@ -998,7 +1034,7 @@ function thought(v){
   if(PWR>0)o.push('Strom ist ein Wunder! ⚡');if(VEH)o.push('Mit dem Karren geht’s schneller! 🛻');
   if(Hp.joy<.3)o.push('Hier ist es etwas trist…','Ein Brunnen wäre schön ⛲');
   if(Hp.total>.75)o.push('Ich liebe dieses Dorf! 😊','Schönes Leben hier!');
-  if(S.vill.length>=popCap())o.push('Es wird eng hier… 🏠');
+  if(homeless()>0)o.push('Ich brauche ein Dach über dem Kopf 🏠','Es wird eng hier…');
   return o[Math.floor(Math.random()*o.length)];
 }
 function lifeUpdate(dt){
@@ -1196,7 +1232,7 @@ function sheetResearch(){
     h+=`<div class="item ${done?'done':need.length?'locked':''}"><div class="ic">${r.i}</div><div class="tx"><b>${r.n}</b><small>${r.desc}</small><div class="cost">${done?'Erforscht':need.length?'🔒 Benötigt: '+need.map(n=>R[n].n).join(', '):costHtml(r.cost)+(r.edu?`<span class="${eduCount()>=r.edu?'':'miss'}">🎓 ${eduCount()}/${r.edu} Gelehrte</span>`:'')}</div></div>${right}</div>`}
   return h;
 }
-function jobText(v){if(v.asleep)return '😴 Schläft';if(v.kid)return v.seat?'🏫 Schulkind':'🧒 Spielt';if(!v.job)return '🚶 Hat gerade frei';if(v.job.t==='i')return '🔍 Untersucht einen geheimnisvollen Ort';if(v.job.t==='g'){const nd=NODE[S.tiles[v.job.x+v.job.y*W]];return '🧺 Sammelt '+(nd?RES[nd.r].n:'')}const b=byId(v.job.id);return b?'👷 Arbeitet: '+B[b.type].i+' '+B[b.type].n:'—'}
+function jobText(v){if(v.asleep)return '😴 Schläft';if(v.kid)return v.seat?'🏫 Schulkind':'🧒 Spielt';if(v.job&&v.job.t==='c')return '🔨 Baut mit an einem Haus';if(!v.job)return '🚶 Hat gerade frei';if(v.job.t==='i')return '🔍 Untersucht einen geheimnisvollen Ort';if(v.job.t==='g'){const nd=NODE[S.tiles[v.job.x+v.job.y*W]];return '🧺 Sammelt '+(nd?RES[nd.r].n:'')}const b=byId(v.job.id);return b?'👷 Arbeitet: '+B[b.type].i+' '+B[b.type].n:'—'}
 const bar=(l,v)=>`<div class="bar"><span>${l}</span><div><i style="width:${Math.round(Math.max(0,Math.min(1,v))*100)}%"></i></div><b>${Math.round(Math.max(0,Math.min(1,v))*100)} %</b></div>`;
 function sheetV(v){
   const Hp=happy(),m=Math.max(0,Math.min(1,Hp.total+v.mo));
@@ -1221,6 +1257,8 @@ function sheetVillage(){
   const ns=S.vill.filter(v=>v.kid).length,pr=S.vill.filter(v=>v.partner&&!v.kid).length/2;
   h+=`<p>💕 Paare: <b>${Math.floor(pr)}</b> · 🧒 Kinder: <b>${ns}</b> · 🎒 Gebildet: <b>${S.vill.filter(v=>v.edu===1).length}</b> · 🎓 Gelehrte: <b>${eduCount()}</b></p>`;
   h+=`<p>🍎 Nahrung: <b class="${fr<0?'miss':''}">${fr>=0?'+':'−'}${f1(fr)}/Min</b> (jeder Bewohner isst ${f1(FOOD_PER*60)}/Min)</p>`;
+  const hl=homeless();if(hl>0)h+=`<p class="miss">🏚️ ${hl} Bewohner ohne Wohnung! ${S.selfBuild!==false?(canPay(B.house.cost)?'Die Bewohner bauen sich selbst Häuser.':'Für Selbstbau fehlen 12 🪵 / 4 🪨 – sonst ziehen sie nach und nach weg.'):'Sie ziehen nach und nach weg.'}</p>`;
+  h+=`<button class="danger" data-act="selfb">🏠 Selbstbau von Häusern: <b>${S.selfBuild!==false?'AN':'AUS'}</b></button>`;
   if(adults()>=pc)h+='<p class="note">Das Dorf ist voll – baue Häuser für neue Bewohner.</p>';
   else if(S.res.food<5)h+='<p class="note">Neue Bewohner kommen nur, wenn genug Nahrung (5+) da ist.</p>';
   else h+=`<p class="desc">Nächster Bewohner in ca. ${Math.ceil(SPAWN_T-S.spawnT)} s.</p>`;
@@ -1252,6 +1290,7 @@ function sheetMenu(){
 function sheetBuilding(b){
   const d=B[b.type],w=wcount(b),sl=slots(b),mL=maxLevel();
   let h=`<h3>${d.i} ${d.n} <span class="lv">Stufe ${b.level}</span></h3><p class="desc">${d.desc}</p>`;
+  if(b.cs>0&&b.self){const n=S.vill.filter(v=>v.job&&v.job.t==='c'&&v.job.id===b.id).length;h+=`<div class="item" style="display:block;border:2px solid #e0a526"><b>🚧 Die Bewohner bauen selbst</b>`+bar('Fortschritt',1-b.cs/b.ct)+`<p>👷 ${n} Helfer · noch ca. ${n?Math.ceil(b.cs/(.5*n)):'?'} s</p></div>`;return h}
   if(b.cs>0){const first=nextSite()===b,here=S.hero&&S.hero.atSite===b.id;
     h+=`<div class="item" style="display:block;border:2px solid #e0a526"><b>🚧 ${b.up?'Ausbau auf Stufe '+(b.level+1):'Baustelle'}</b>`+bar('Fortschritt',1-b.cs/b.ct)+`<p>⏳ Noch ${Math.ceil(b.cs/bSpeed())} s · ${here?'🔨 '+heroName()+' arbeitet hier':first?'🚶 '+heroName()+' ist unterwegs':'⏸️ In der Warteschlange'}</p>`;
     if(!first)h+=`<button class="sm" data-act="hfirst:${b.id}">⚡ Als Nächstes bauen</button> `;
@@ -1319,7 +1358,7 @@ function updateUI(){
   for(const r in RES){if(!show[r])continue;const v=S.res[r],d=rt[r]||0,full=v>=cap(r)-.01;
     h+=`<div class="chip ${full?'full':''} ${r==='food'&&v<=0.001?'warn':''} ${r==='gold'&&has('stall')?'click':''}" ${r==='gold'&&has('stall')?'data-act="trade"':''}><span>${RES[r].i}</span><b>${fmt(v)}</b>${Math.abs(d)>=.05?`<small class="${d<0?'neg':''}">${d>0?'+':'−'}${f1(d)}/m</small>`:''}</div>`}
   const idle=idleV().length;
-  const nk=S.vill.length-adults();h+=`<div class="chip"><span>👥</span><b>${adults()}/${popCap()}</b><small>${nk?'+'+nk+'🧒 ':''}${idle} frei</small></div>`;
+  const nk=S.vill.length-adults();h+=`<div class="chip ${homeless()>0?'warn':''}"><span>👥</span><b>${adults()}/${popCap()}</b><small>${nk?'+'+nk+'🧒 ':''}${idle} frei</small></div>`;
   if(S.hero)h+=`<div class="chip click" data-act="hero"><span>${HEROES[S.hero.c].i}</span><b>${heroStatus()}</b></div>`;
   const li=lvInfo();h+=`<div class="chip"><span>⭐</span><b>Lv ${li.L}</b><small>${Math.floor(li.x/li.n*100)}%</small></div>`;
   const Hp=happy(),dk=darkness();h+=`<div class="chip"><span>${moodI(Hp.total)}</span><b>${Math.round(Hp.total*100)}%</b></div><div class="chip"><span>${SEAS[seasonIdx()].i}</span><b>Tag ${dayNo()}</b><small>${dk>.35?'🌙':dk>0?'🌆':'☀️'}</small></div>`;
@@ -1407,6 +1446,7 @@ function act(a,p){
     case 'ucancel':{const b=byId(+p);if(b&&b.up&&b.cs>0){if(b.uc)for(const r in b.uc)addRes(r,b.uc[r]);delete b.cs;delete b.ct;delete b.up;delete b.uc;delete b.qs;toast('Ausbau abgebrochen – alles zurück');save()}renderSheet();break}
     case 'hgather':{const h=S.hero;if(!h)return;heroFree();h.cmd='gather';h.job={t:'g',x:sheetArg.x,y:sheetArg.y};h.ph='go';closeSheet();toast(`${HEROES[h.c].i} ${heroName().split(' ')[0]} geht sammeln`);break}
     case 'hinv':{const m=activeMarker();if(!m||!S.hero)return;heroFree();const h=S.hero;h.cmd='inv';h.inv={id:m.st.id,x:m.x,y:m.y};h.ph='go';closeSheet();toast(`🔍 ${heroName().split(' ')[0]} macht sich auf den Weg`);break}
+    case 'selfb':S.selfBuild=S.selfBuild===false;toast(S.selfBuild?'🏠 Bewohner bauen jetzt selbst Häuser':'Selbstbau ausgeschaltet');renderSheet();break;
     case 'trade':openSheet('trade');break;
     case 'bank':openSheet('bank');break;
     case 'bamt':bankAmt=p==='all'?'all':+p;renderSheet();break;
