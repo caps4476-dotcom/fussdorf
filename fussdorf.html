@@ -301,7 +301,7 @@ function happy(){
   let jp=0;for(const b of S.buildings)if(B[b.type].joy&&!isSite(b))jp+=B[b.type].joy*b.level;
   if(seasonIdx()===3)jp+=5;
   const joy=Math.min(1,jp*2/pop*(S.hero&&S.hero.c==='lyonessa'?1.5:1));
-  return {food,home,joy,total:.4*food+.3*home+.3*joy};
+  return {food,home,joy,total:Math.max(0,.4*food+.3*home+.3*joy-TAX[S.tax==null?1:S.tax].p)};
 }
 const needXP=L=>Math.round(30*Math.pow(L,1.5));
 function lvInfo(){let L=1,x=S.xp;while(x>=needXP(L)){x-=needXP(L);L++}return{L,x,n:needXP(L)}}
@@ -413,6 +413,7 @@ function econ(dt,apply){
     }
   }
   add('food',-S.vill.length*FOOD_PER*dt);
+  {const tg=taxPerDay();if(tg)add('gold',tg/DAY*dt)}
   if(apply)for(const r in d){if(d[r]>0){S.made[r]=(S.made[r]||0)+d[r];if(r!=='research')S.xp+=d[r]*.1}S.res[r]=Math.max(0,Math.min(cap(r),S.res[r]+d[r]))}
   return d;
 }
@@ -721,6 +722,9 @@ function finishInv(id){
 }
 
 // ======================= FAMILIE & BILDUNG =======================
+const TAX=[{n:'Keine',g:0,p:0},{n:'Niedrig',g:1,p:0},{n:'Mittel',g:2,p:.05},{n:'Hoch',g:3,p:.12}];
+const taxLv=()=>S.tax==null?1:S.tax;
+function taxPerDay(){const t=TAX[taxLv()];let g=0;for(const v of S.vill)if(!v.kid)g+=t.g*(1+.5*(v.edu||0));return g}
 const pickA=a=>a[Math.floor(Math.random()*a.length)];
 function familyTick(dt,live){
   const Hp=happy();
@@ -1032,6 +1036,7 @@ function thought(v){
   if(v.partner){const pt=S.vill.find(x=>x.id===v.partner);if(pt)o.push(`Ich denke an ${pt.name} 💕`)}
   if(v.edu===2)o.push('Wissen ist Macht 🎓');
   if(PWR>0)o.push('Strom ist ein Wunder! ⚡');if(VEH)o.push('Mit dem Karren geht’s schneller! 🛻');
+  if(taxLv()>=3)o.push('Diese Steuern sind zu hoch! 😠','Schon wieder zahlen …');else if(taxLv()===0)o.push('Keine Steuern – herrlich! 😊');
   if(Hp.joy<.3)o.push('Hier ist es etwas trist…','Ein Brunnen wäre schön ⛲');
   if(Hp.total>.75)o.push('Ich liebe dieses Dorf! 😊','Schönes Leben hier!');
   if(homeless()>0)o.push('Ich brauche ein Dach über dem Kopf 🏠','Es wird eng hier…');
@@ -1265,6 +1270,9 @@ function sheetVillage(){
   const Hp=happy(),SE=SEAS[seasonIdx()];
   h+=`<p style="margin-top:10px"><b>${moodI(Hp.total)} Zufriedenheit ${Math.round(Hp.total*100)} %</b> → Produktion ×${f1(.8+.4*Hp.total)}</p>`;
   h+=bar('🍎 Nahrung',Hp.food)+bar('🏠 Wohnen',Hp.home)+bar('🎉 Freude',Hp.joy);
+  {const tl=taxLv();h+=`<p style="margin-top:8px">💰 <b>Steuern: ${TAX[tl].n}</b> → +${f1(taxPerDay())} Gold pro Tag</p><div class="row" style="gap:5px">`;
+   TAX.forEach((t,i)=>h+=`<button class="sm" style="flex:1;${i===tl?'background:#e0a526;color:#3a2c1a':''}" data-act="tax:${i}">${t.n}${t.p?`<br><small>−${Math.round(t.p*100)} % 😊</small>`:''}</button>`);
+   h+='</div><p class="desc">Jeder Erwachsene zahlt pro Tag; Gebildete 1,5×, Gelehrte 2×. Hohe Steuern drücken die Zufriedenheit.</p>'}
   h+='<p class="desc">Wohnen steigt mit höheren Hausstufen, Freude mit Blumenbeeten, Brunnen und Marktplätzen.</p>';
   const nx=SEAS[(seasonIdx()+1)%4];
   h+=`<p>${SE.i} ${SE.n}, Tag ${dayNo()} – Nahrung aus Feldern, Sammeln & Fischen ×${f1(SE.food)}</p><p class="desc">${nx.i} ${nx.n} beginnt in ca. ${Math.ceil(seasonLeft()/60)} Min.${nx.n==='Winter'?' – denk an Vorräte und Lagerplatz!':''}</p>`;
@@ -1446,6 +1454,7 @@ function act(a,p){
     case 'ucancel':{const b=byId(+p);if(b&&b.up&&b.cs>0){if(b.uc)for(const r in b.uc)addRes(r,b.uc[r]);delete b.cs;delete b.ct;delete b.up;delete b.uc;delete b.qs;toast('Ausbau abgebrochen – alles zurück');save()}renderSheet();break}
     case 'hgather':{const h=S.hero;if(!h)return;heroFree();h.cmd='gather';h.job={t:'g',x:sheetArg.x,y:sheetArg.y};h.ph='go';closeSheet();toast(`${HEROES[h.c].i} ${heroName().split(' ')[0]} geht sammeln`);break}
     case 'hinv':{const m=activeMarker();if(!m||!S.hero)return;heroFree();const h=S.hero;h.cmd='inv';h.inv={id:m.st.id,x:m.x,y:m.y};h.ph='go';closeSheet();toast(`🔍 ${heroName().split(' ')[0]} macht sich auf den Weg`);break}
+    case 'tax':S.tax=+p;toast(`💰 Steuern: ${TAX[S.tax].n}`);renderSheet();break;
     case 'selfb':S.selfBuild=S.selfBuild===false;toast(S.selfBuild?'🏠 Bewohner bauen jetzt selbst Häuser':'Selbstbau ausgeschaltet');renderSheet();break;
     case 'trade':openSheet('trade');break;
     case 'bank':openSheet('bank');break;
