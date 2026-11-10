@@ -1077,7 +1077,10 @@ function drawBuilding(b,cnt){
   ctx.fillStyle='rgba(255,255,255,.18)';rr(ctx,px,py,s,s/2,5);ctx.fill();
   if(curSi===3){ctx.fillStyle='rgba(255,255,255,.7)';rr(ctx,px,py,s,s*.3,5);ctx.fill()}
   ctx.strokeStyle=isH&&b.level>=5?'#ffd36b':'rgba(0,0,0,.4)';ctx.lineWidth=isH&&b.level>=5?2:1;rr(ctx,px,py,s,s,5);ctx.stroke();
-  ctx.font=`${s*.58}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(icon,px+s/2,py+s/2+1);
+  ctx.fillStyle='rgba(255,250,235,.82)';ctx.beginPath();ctx.arc(px+s/2,py+s/2+1,s*.37,0,7);ctx.fill();
+  ctx.fillStyle='#000';ctx.font=`${s*.62}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(icon,px+s/2,py+s/2+2);
+  {const out=d.prod?Object.keys(d.prod)[0]:d.conv?Object.keys(d.conv.out)[0]:null;
+   if(out&&RES[out]&&RES[out].i!==icon&&!isSite(b)){const bx=px+5,by=py+5;ctx.fillStyle='#fff';ctx.strokeStyle='rgba(0,0,0,.45)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(bx,by,6.5,0,7);ctx.fill();ctx.stroke();ctx.fillStyle='#000';ctx.font='8.5px sans-serif';ctx.fillText(RES[out].i,bx,by+.5)}}
   if(isSite(b))ctx.globalAlpha=Math.min(1,ctx.globalAlpha/.45);
   if(b.cs>0){
     if(isSite(b)){ctx.fillStyle='rgba(120,90,50,.45)';rr(ctx,px,py,s,s,5);ctx.fill()}
