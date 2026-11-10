@@ -139,6 +139,8 @@ const B={
   stall:{n:'Händlerstand',i:'🏪',roof:'#d08a3a',cost:{wood:20,stone:10},desc:'Hier verkaufst du Waren für Gold und kaufst ein. Jede Stufe: +8 % bessere Preise. Lockt den fahrenden Händler an.'},
   tavern:{n:'Taverne',i:'🍺',roof:'#8a4a2a',cost:{wood:30,stone:15},joy:4,req:'s_tavern',lockT:'🔒 Geschichte: Kapitel 1',desc:'Hildegards Taverne: +4 Freude pro Stufe. Hier werden Geschichten erzählt.'},
   diamondmine:{n:'Diamantmine',i:'💎',roof:'#3a6a8a',cost:{planks:30,stone:40,iron:15,tools:8,gold:80},slots:2,prod:{diamond:.0011},rare:1,near:OR,r:2,req:'gemcraft',desc:'Gräbt tief nach Diamanten – Funde sind selten! Braucht eine Erzader im Radius 2 (Erzberge). Diamanten 💎 beschleunigen Bauten und Forschung, kaufen Elite-Technik und bringen auf dem Markt viel Gold.'},
+  rodel:{n:'Rodelbahn',i:'🛷',roof:'#8fb0c4',cost:{wood:40,planks:15},joy:1,wjoy:10,desc:'Im Winter das Highlight: +10 Freude pro Stufe (sonst +1). Bei Schnee sausen die Bewohner auf Schlitten den Hang hinunter.'},
+  skate:{n:'Eisbahn',i:'⛸️',roof:'#6f9fc0',cost:{stone:30,planks:20,gold:20},joy:1,wjoy:12,desc:'Im Winter friert die Bahn zu: +12 Freude pro Stufe (sonst +1). Die Bewohner drehen ihre Runden auf Schlittschuhen.'},
   jeweler:{n:'Juwelier',i:'💍',roof:'#8a3a7a',cost:{stone:40,planks:30,gold:100},joy:10,req:'jewelry',desc:'Schmuck aus Diamanten: +10 Freude pro Stufe. Braucht Diamanten 💎 zum Bau.'},
   monument:{n:'Mondkristall-Denkmal',i:'🔮',roof:'#4a4a8a',cost:{stone:60,iron:10,gold:100},joy:12,req:'s_monument',lockT:'🔒 Geschichte: Kapitel 7',desc:'Erinnert an Eichenhall: +12 Freude pro Stufe.'}
 };
@@ -307,6 +309,7 @@ const heroName=()=>S.hero?HEROES[S.hero.c].n:'Held';
 function nextSite(){let best=null;for(const b of S.buildings)if(b.cs>0&&!b.self&&(!best||(b.qs||0)<(best.qs||0)))best=b;return best}
 const zonesCount=()=>S.zones.filter(Boolean).length;
 const maxLevel=()=>Math.min(zonesCount()+1,S.tech.arch2?10:S.tech.arch1?7:5);
+const joyOf=d=>d.wjoy&&seasonIdx()===3?d.wjoy:d.joy;
 const beds=(b,L)=>isSite(b)?0:b.type==='house'?HOUSE_BEDS[(L||b.level)-1]:b.type==='camp'?2:0;
 const seasonIdx=()=>Math.floor(S.gt/SEASON)%4;
 const dayNo=()=>Math.floor(S.gt/DAY)+1;
@@ -317,7 +320,7 @@ function happy(){
   const pop=Math.max(1,S.vill.length),food=S.res.food>0.001?1:0;
   const hs=S.buildings.filter(b=>b.type==='house'&&!isSite(b));
   const home=(hs.length?Math.min(1,.3+.175*hs.reduce((a,b)=>a+b.level,0)/hs.length):.3)*Math.min(1,popCap()/Math.max(1,adults()));
-  let jp=0;for(const b of S.buildings)if(B[b.type].joy&&!isSite(b))jp+=B[b.type].joy*b.level;
+  let jp=0;for(const b of S.buildings)if(B[b.type].joy&&!isSite(b))jp+=joyOf(B[b.type])*b.level;
   if(seasonIdx()===3)jp+=5;
   if(adults()>=6)jp+=5*(S.sec==null?1:S.sec);
   const joy=Math.min(1,jp*2/pop*(S.hero&&S.hero.c==='lyonessa'?1.5:1)+(festOn()?.4:0));
@@ -933,6 +936,7 @@ function updV(v,dt){
     if(v.asleep){v.asleep=false;v.tx=null;v.wait=Math.random()*2}
     if(v.wait>0){v.wait-=dt;return}
     if(v.tx==null&&!v.kid&&(v.role==='t'||festOn())){const st=v.role==='t'?S.buildings.find(b=>b.type==='stall'&&!isSite(b)):S.buildings[0];if(st){v.tx=Math.max(.3,Math.min(W-.3,st.x+.5+(Math.random()-.5)*2.6));v.ty=Math.max(.3,Math.min(H-.3,st.y+.5+(Math.random()-.5)*2.6))}}
+    if(v.tx==null&&seasonIdx()===3&&Math.random()<.5){const ws=S.buildings.filter(b=>B[b.type].wjoy&&!isSite(b));if(ws.length){const st=ws[Math.floor(Math.random()*ws.length)];v.tx=Math.max(.3,Math.min(W-.3,st.x+.5+(Math.random()-.5)*1.8));v.ty=Math.max(.3,Math.min(H-.3,st.y+1.2))}}
     if(v.tx==null){const sc=v.kid&&v.seat&&S.buildings.find(b=>b.type==='school'&&!isSite(b)),hs=S.buildings.filter(b=>B[b.type].house&&!isSite(b)),hp=v.home&&byId(v.home),h=sc||(hp&&B[hp.type].house?hp:hs[Math.floor(Math.random()*hs.length)]);v.tx=Math.max(.3,Math.min(W-.3,h.x+.5+(Math.random()-.5)*3));v.ty=Math.max(.3,Math.min(H-.3,h.y+.5+(Math.random()-.5)*3))}
     if(walk(v,v.tx,v.ty,dt,SPEED*.5)){v.tx=null;v.wait=1+Math.random()*3}
     return;
@@ -1068,6 +1072,33 @@ function drawTile(c,x,y){
 }
 let floats=[];
 function floatTxt(x,y,t){floats.push({x,y,t,a:0})}
+const FUNC=['#c0392b','#2e86c1','#27ae60','#8e44ad','#e67e22','#d4ac0d'];
+function drawWinterFun(b,px,py,s){
+  const t=performance.now()/1000,n=Math.min(6,1+b.level);
+  if(b.type==='skate'){
+    const g=ctx.createLinearGradient(px,py,px+s,py+s);g.addColorStop(0,'#e8f6fd');g.addColorStop(1,'#a9d6ef');
+    ctx.fillStyle=g;rr(ctx,px,py,s,s,6);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;rr(ctx,px+1,py+1,s-2,s-2,6);ctx.stroke();
+    const cx=px+s/2,cy=py+s/2,rx=s*.33,ry=s*.27;
+    ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,0,0,7);ctx.stroke();
+    ctx.strokeStyle='rgba(120,170,200,.5)';ctx.beginPath();ctx.ellipse(cx,cy,rx*.55,ry*.5,0,0,7);ctx.stroke();
+    for(let i=0;i<n;i++){const a=t*(.9+i*.07)+i*6.283/n,x=cx+Math.cos(a)*rx,y=cy+Math.sin(a)*ry;
+      ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.ellipse(x,y+3,2.6,1.2,0,0,7);ctx.fill();
+      ctx.fillStyle=FUNC[(b.id+i)%FUNC.length];ctx.beginPath();ctx.arc(x,y,2.6,0,7);ctx.fill();
+      ctx.fillStyle='#f5d0a9';ctx.beginPath();ctx.arc(x,y-2.6,1.7,0,7);ctx.fill()}
+  }else{
+    const g=ctx.createLinearGradient(px,py,px+s,py+s);g.addColorStop(0,'#ffffff');g.addColorStop(1,'#c9dbe6');
+    ctx.fillStyle=g;rr(ctx,px,py,s,s,6);ctx.fill();
+    ctx.fillStyle='rgba(150,180,200,.35)';ctx.beginPath();ctx.moveTo(px+2,py+s*.25);ctx.lineTo(px+s*.25,py+2);ctx.lineTo(px+s-2,py+s*.75);ctx.lineTo(px+s*.75,py+s-2);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.95)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(px+s*.12,py+s*.12);ctx.lineTo(px+s*.88,py+s*.88);ctx.stroke();
+    ctx.fillStyle='#3d6b3d';for(const [a,c] of [[.12,.62],[.62,.12],[.8,.35]]){ctx.beginPath();ctx.moveTo(px+s*a,py+s*c-5);ctx.lineTo(px+s*a-3,py+s*c+2);ctx.lineTo(px+s*a+3,py+s*c+2);ctx.fill()}
+    for(let i=0;i<n;i++){const f=(t*.28+i/n)%1,e=f*f,x=px+s*(.12+.76*e),y=py+s*(.12+.76*e);
+      ctx.save();ctx.translate(x,y);ctx.rotate(.785);ctx.fillStyle='#8b4a1e';ctx.fillRect(-3.2,-1.3,6.4,2.6);ctx.restore();
+      ctx.fillStyle=FUNC[(b.id+i)%FUNC.length];ctx.beginPath();ctx.arc(x-.5,y-2,2.2,0,7);ctx.fill();
+      ctx.fillStyle='#f5d0a9';ctx.beginPath();ctx.arc(x-1,y-4.3,1.5,0,7);ctx.fill();
+      if(f>.85){ctx.fillStyle='rgba(255,255,255,.8)';ctx.beginPath();ctx.arc(x+2,y+2,2.5*(f-.85)*8,0,7);ctx.fill()}}
+  }
+  ctx.font='9px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#000';ctx.fillText(B[b.type].i,px+s-6,py+s-6);
+}
 function drawBuilding(b,cnt){
   const d=B[b.type],isH=b.type==='house',pad=Math.max(-1.5,3.2-b.level*.9),px=b.x*T+pad,py=b.y*T+pad,s=T-2*pad;
   const roof=isH?HOUSE_ROOF[b.level-1]:d.roof,icon=isH?HOUSE_I[b.level-1]:d.i;
@@ -1082,6 +1113,7 @@ function drawBuilding(b,cnt){
   {const out=d.prod?Object.keys(d.prod)[0]:d.conv?Object.keys(d.conv.out)[0]:null;
    if(out&&RES[out]&&RES[out].i!==icon&&!isSite(b)){const bx=px+5,by=py+5;ctx.fillStyle='#fff';ctx.strokeStyle='rgba(0,0,0,.45)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(bx,by,6.5,0,7);ctx.fill();ctx.stroke();ctx.fillStyle='#000';ctx.font='8.5px sans-serif';ctx.fillText(RES[out].i,bx,by+.5)}}
   if(isSite(b))ctx.globalAlpha=Math.min(1,ctx.globalAlpha/.45);
+  if(d.wjoy&&seasonIdx()===3&&!isSite(b))drawWinterFun(b,px,py,s);
   if(b.cs>0){
     if(isSite(b)){ctx.fillStyle='rgba(120,90,50,.45)';rr(ctx,px,py,s,s,5);ctx.fill()}
     ctx.strokeStyle='#7a5230';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(px+s,py+s);ctx.moveTo(px+s,py);ctx.lineTo(px,py+s);ctx.rect(px+1,py+1,s-2,s-2);ctx.stroke();
@@ -1141,6 +1173,8 @@ function thought(v){
   if(v.job&&v.job.t==='h')o.push('Mit anpacken! 🔨','Gemeinsam geht’s schneller!');
   if(!v.job&&v.role==='w')o.push('Alles ruhig im Dorf 🛡️','Ich halte die Augen offen 👀');
   if(!v.job&&v.role==='t')o.push('Frische Ware! Kauft ein! 🛒','Ein gutes Geschäft!');
+  if(seasonIdx()===3&&S.buildings.some(b=>b.type==='rodel'&&!isSite(b)))o.push('Ab auf die Rodelbahn! 🛷','Wer ist schneller unten? 🛷');
+  if(seasonIdx()===3&&S.buildings.some(b=>b.type==='skate'&&!isSite(b)))o.push('Eislaufen macht so Spaß! ⛸️','Ich drehe noch eine Runde ⛸️');
   if(!v.job&&festOn())o.push('Was für ein Fest! 🎉','Musik und Tanz! 💃','Noch ein Stück Kuchen? 🍰');
   if(v.job&&v.job.t==='i')o.push('Was mag hier verborgen sein? 🔍','Ein seltsamer Ort …');
   if(S.story.ch>0&&!v.job)o.push('Hast du von Eichenhall gehört?','Karak ist ein seltsamer Kauz …','Der Halbmond … was bedeutet er?');
@@ -1469,7 +1503,7 @@ function sheetBuilding(b){
   if(b.type==='bank'&&!isSite(b))h+=`<p>🏦 Limit: ${bankCap()} Gold · Kredit bis ${loanMax()}</p><button class="big" style="background:#6a7a8a" data-act="bank">🏦 Zur Bank</button>`;
   if(b.type==='stall'&&!isSite(b))h+=`<p>💹 Preisbonus: ×${f1(tradeBonus())}</p><button class="big" style="background:#b5893a" data-act="trade">💰 Zum Markt</button>`;
   if(d.house)h+=`<p>🛏️ Wohnplätze: <b>${beds(b)}</b></p>`;
-  if(d.joy)h+=`<p>🎉 Freude: <b>+${d.joy*b.level}</b></p>`;
+  if(d.joy)h+=`<p>🎉 Freude: <b>+${joyOf(d)*b.level}</b>${d.wjoy?(seasonIdx()===3?' ❄️ Winterbetrieb!':` <small>(im Winter +${d.wjoy*b.level})</small>`):''}</p>`;
   if(d.store)h+=`<p>📥 Abgabestelle für Sammler</p>`;
   if(!d.fixed&&!d.joy)h+=hasRoad(b)?'<p>🛣️ Weganschluss: <b>+10 %</b></p>':'<p class="desc">🛣️ Kein Weganschluss – ein Weg daneben bringt +10 %.</p>';
   if(d.cap)h+=`<p>📦 Lagerplatz: +${d.cap*b.level} (gesamt ${cap('wood')})</p>`;
@@ -1486,7 +1520,7 @@ function sheetBuilding(b){
     if(b.cs>0){}
     else if(b.level>=10)h+='<p class="note">⭐ Maximale Stufe erreicht.</p>';
     else if(b.level>=mL)h+=`<p class="note">🔒 Max. Stufe ${mL}. ${b.level>=5&&!S.tech.arch1?'Stufe 6–7 braucht die Forschung „Baukunst“.':b.level>=7&&!S.tech.arch2?'Stufe 8–10 braucht „Meisterbaukunst“.':'Schalte mehr Zonen frei.'}</p>`;
-    else{const c=upCost(b),bonus=b.type==='bank'?`Limit ${250*(b.level+1)*(b.level+1)} Gold`:b.type==='stall'?'+8 % bessere Preise':b.type==='house'?`+${beds(b,b.level+1)-beds(b)} Wohnplätze, neues Aussehen`:d.cap?`+${d.cap} Lagerplatz`:d.joy?`+${d.joy} Freude`:'+50 % Produktion, +1 Arbeitsplatz';
+    else{const c=upCost(b),bonus=b.type==='bank'?`Limit ${250*(b.level+1)*(b.level+1)} Gold`:b.type==='stall'?'+8 % bessere Preise':b.type==='house'?`+${beds(b,b.level+1)-beds(b)} Wohnplätze, neues Aussehen`:d.cap?`+${d.cap} Lagerplatz`:d.joy?`+${d.wjoy||d.joy} Freude`:'+50 % Produktion, +1 Arbeitsplatz';
       h+=`<button class="big" data-act="up:${b.id}" ${canPay(c)?'':'disabled'}>⬆️ Ausbauen auf Stufe ${b.level+1} <small>(${bonus})</small><br><small class="c">${costHtml(c)}</small></button>`}
     const rf=refund(b);
     h+=`<div class="row"><button class="danger" data-act="move:${b.id}">↔️ Verschieben</button><button class="danger" data-act="demo:${b.id}">${demoConfirm===b.id?'⚠️ Sicher? Nochmal tippen':'🗑️ Abreißen'}</button></div><p class="desc">Verschieben ist kostenlos. Abriss gibt ${rf.full?'<b>100 %</b> zurück (gerade erst gebaut)':'50 % der Baukosten'} zurück.</p>`;
