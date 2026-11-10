@@ -107,7 +107,7 @@ const RES={
   wood:{n:'Holz',i:'🪵'}, stone:{n:'Stein',i:'🪨'}, food:{n:'Nahrung',i:'🍎'},
   grain:{n:'Getreide',i:'🌾'}, flour:{n:'Mehl',i:'🥣'},
   planks:{n:'Bretter',i:'🪚'}, ore:{n:'Erz',i:'⛏️'}, iron:{n:'Eisen',i:'⚙️'}, tools:{n:'Werkzeuge',i:'🔧'},
-  research:{n:'Forschung',i:'🔬'}, gold:{n:'Gold',i:'💰'}, diamond:{n:'Diamanten',i:'💎'}
+  research:{n:'Forschung',i:'🔬'}, gold:{n:'Gold',i:'💰'}, diamond:{n:'Diamanten',i:'💎'}, trash:{n:'Müll',i:'🗑️'}
 };
 const THEMES=['berg','wald','berg','see','start','wald','berg','wiese','see'];
 const THEME_N={start:'Lichtung',wald:'Dichter Wald',berg:'Erzberge',see:'Seenland',wiese:'Blumenwiese'};
@@ -139,6 +139,7 @@ const B={
   stall:{n:'Händlerstand',i:'🏪',roof:'#d08a3a',cost:{wood:20,stone:10},desc:'Hier verkaufst du Waren für Gold und kaufst ein. Jede Stufe: +8 % bessere Preise. Lockt den fahrenden Händler an.'},
   tavern:{n:'Taverne',i:'🍺',roof:'#8a4a2a',cost:{wood:30,stone:15},joy:4,req:'s_tavern',lockT:'🔒 Geschichte: Kapitel 1',desc:'Hildegards Taverne: +4 Freude pro Stufe. Hier werden Geschichten erzählt.'},
   diamondmine:{n:'Diamantmine',i:'💎',roof:'#3a6a8a',cost:{planks:30,stone:40,iron:15,tools:8,gold:80},slots:2,prod:{diamond:.0011},rare:1,near:OR,r:2,req:'gemcraft',desc:'Gräbt tief nach Diamanten – Funde sind selten! Braucht eine Erzader im Radius 2 (Erzberge). Diamanten 💎 beschleunigen Bauten und Forschung, kaufen Elite-Technik und bringen auf dem Markt viel Gold.'},
+  dump:{n:'Müllplatz',i:'🚛',roof:'#5a6a3a',cost:{wood:40,stone:30,planks:15},slots:2,desc:'Müllmänner sammeln den Müll im Dorf ein und lagern ihn hier. Ab ca. 15 Einwohnern entsteht Müll – liegt er herum, sinkt die Zufriedenheit. Mit „Müllverbrennung“ heizt der Müll dein Kraftwerk.'},
   rodel:{n:'Rodelbahn',i:'🛷',roof:'#8fb0c4',fw:2,fh:3,cost:{wood:40,planks:15},joy:1,wjoy:10,desc:'Im Winter das Highlight: +10 Freude pro Stufe (sonst +1). Großer Hang (2×3 Felder) – bei Schnee sausen viele Bewohner auf Schlitten hinunter.'},
   skate:{n:'Eisbahn',i:'⛸️',roof:'#6f9fc0',fw:3,fh:2,cost:{stone:30,planks:20,gold:20},joy:1,wjoy:12,desc:'Im Winter friert die Bahn zu: +12 Freude pro Stufe (sonst +1). Große Fläche (3×2 Felder) – viele Bewohner drehen ihre Runden auf Schlittschuhen.'},
   jeweler:{n:'Juwelier',i:'💍',roof:'#8a3a7a',cost:{stone:40,planks:30,gold:100},joy:10,req:'jewelry',desc:'Schmuck aus Diamanten: +10 Freude pro Stufe. Braucht Diamanten 💎 zum Bau.'},
@@ -167,6 +168,7 @@ Object.assign(R,{
   agri2:{n:'Fruchtfolge',i:'🌱',cost:{research:120,gold:120},need:['milling'],desc:'+25 % Nahrung und Getreide.'},
   mining2:{n:'Tiefbau',i:'🪨',cost:{research:150,gold:150,tools:10},need:['mining','tools2'],desc:'+25 % Stein und Erz.'},
   arch1:{n:'Baukunst',i:'🏛️',cost:{research:180,gold:250,planks:100},need:['tools2'],desc:'Gebäude bis Stufe 7 (wenn genug Zonen frei sind).'},
+  incinerate:{n:'Müllverbrennung',i:'🔥',cost:{research:150,gold:150,iron:10},need:['electricity'],desc:'Das Kraftwerk verbrennt gesammelten Müll statt Holz. Aus einem Problem wird Energie!'},
   gemcraft:{n:'Edelsteinkunde',i:'💎',cost:{research:100,gold:120,tools:10},need:['smithing'],desc:'Schaltet die Diamantmine frei.'},
   gemcraft2:{n:'Diamantbohrer',i:'🔩',cost:{research:180,gold:200},need:['gemcraft','tools2'],desc:'Elite-Technik: +50 % Diamanten, +15 % Stein und Erz. Kostet Diamanten.'},
   jewelry:{n:'Juwelierkunst',i:'💍',cost:{research:150,gold:200},need:['gemcraft','market'],desc:'Schaltet den Juwelier frei (viel Freude). Kostet Diamanten.'},
@@ -328,7 +330,7 @@ function happy(){
   if(seasonIdx()===3)jp+=5;
   if(adults()>=6)jp+=5*(S.sec==null?1:S.sec);
   const joy=Math.min(1,jp*2/pop*(S.hero&&S.hero.c==='lyonessa'?1.5:1)+(festOn()?.4:0));
-  return {food,home,joy,total:Math.max(0,Math.min(1,.4*food+.3*home+.3*joy-taxPen()))};
+  return {food,home,joy,total:Math.max(0,Math.min(1,.4*food+.3*home+.3*joy-taxPen()-.25*dirtLvl()))};
 }
 const needXP=L=>Math.round(30*Math.pow(L,1.5));
 function lvInfo(){let L=1,x=S.xp;while(x>=needXP(L)){x-=needXP(L);L++}return{L,x,n:needXP(L)}}
@@ -382,7 +384,7 @@ function genMap(seed){
 let S;
 function newGame(){
   const seed=(Math.random()*1e9)|0;
-  S={v:1,seed,time:Date.now(),res:{wood:15,stone:5,food:15,grain:0,flour:0,planks:0,ore:0,iron:0,tools:0,research:0,gold:0,diamond:0},
+  S={v:1,seed,time:Date.now(),res:{wood:15,stone:5,food:15,grain:0,flour:0,planks:0,ore:0,iron:0,tools:0,research:0,gold:0,diamond:0,trash:0},
      buildings:[],vill:[],zones:[0,0,0,0,1,0,0,0,0],tech:{},nid:1,spawnT:0,flags:{},made:{},goal:0,gt:90,tv:2,xp:0,story:{ch:0,on:0,st:0,pages:[],mk:{},nt:-1}};
   S.tiles=genMap(seed);
   S.amt=S.tiles.map(t=>NODE[t]?NODE[t].max:0);
@@ -432,9 +434,9 @@ function idleTick(dt,live){
   // --- Erkunder kehren zurück ---
   for(const v of S.vill)if(v.job&&v.job.t==='x'&&S.gt>=v.job.until){v.job=null;v.tx=null;const c=S.buildings[0];v.x=c.x+.5+(Math.random()-.5);v.y=c.y+1.3;exploreLoot(v,live)}
   // --- Rollen: Wache (nachts) / Händler (tags) ---
-  const night=isNight(),need=guardNeed(),tmax=I.trade&&has('stall')?1+stallLv():0;let gi=0,ti=0;
+  const night=isNight(),need=guardNeed(),tmax=I.trade&&has('stall')?1+stallLv():0,smax=(S.dirt||0)>1?Math.ceil(adults()/10):0;let gi=0,ti=0,si2=0;
   for(const v of S.vill){if(v.job||v.kid){v.role=null;continue}
-    if(night&&I.guard&&gi<need){v.role='w';v.asleep=false;gi++}else if(!night&&ti<tmax){v.role='t';ti++}else v.role=null}
+    if(night&&I.guard&&gi<need){v.role='w';v.asleep=false;gi++}else if(!night&&ti<tmax){v.role='t';ti++}else if(!night&&I.sweep!==false&&si2<smax){v.role='s';si2++}else v.role=null}
   if(night){S.sec=adults()>=6?(I.guard?Math.min(1,gi/need):0):1;
     if(S.thN!==dayNo()){S.thN=dayNo();
       if(adults()>=8&&S.sec<1&&Math.random()<.6*(1-S.sec)){const fl=Math.floor(S.res.food*.1),gl=Math.floor(Math.min(150,S.res.gold*.08));S.res.food-=fl;S.res.gold-=gl;
@@ -462,6 +464,26 @@ function exploreLoot(v,live){
   if(live)toast(`🗺️ ${v.name} ist von der Erkundung zurück: ${txt}${got.diamond?' – ein Diamant! 💎':''}`);
 }
 
+// ======================= MÜLL =======================
+const TRASH_P=.012,DUMP_C=.5,SWEEP_C=.1;
+const trashGen=()=>Math.max(0,S.vill.length-15)*TRASH_P;
+const dirtLvl=()=>Math.min(1,(S.dirt||0)/(Math.max(10,S.vill.length)*6));
+let TR_COL=0,TR_SW=0;
+function trashTick(dt,live){
+  if(S.dirt==null)S.dirt=0;
+  S.dirt+=trashGen()*dt;
+  const room=()=>Math.max(0,cap('trash')-S.res.trash);
+  let col=0;const hf=S.res.food<=0.001?.5:1;
+  for(const b of S.buildings){if(b.type!=='dump'||isSite(b))continue;const w=wcount(b);if(!w)continue;col+=DUMP_C*w*(1+.5*(b.level-1))*hf}
+  const sw=S.vill.filter(v=>v.role==='s').length*SWEEP_C;
+  TR_COL=col;TR_SW=sw;
+  const tot=Math.min(S.dirt,(col+sw)*dt,room());
+  if(tot>0){S.dirt-=tot;S.res.trash+=tot;S.made.trash=(S.made.trash||0)+tot}
+  const dl=dirtLvl();
+  if(live&&dl>.5&&!S.flags.dw){S.flags.dw=1;toast(`🗑️ Überall liegt Müll herum! Baue einen 🚛 Müllplatz${has('dump')?' oder stelle mehr Müllmänner ein':''}.`)}
+  if(dl<.3)S.flags.dw=0;
+}
+
 // ======================= WIRTSCHAFT =======================
 function workerCounts(){const c={};for(const v of S.vill)if(v.job&&v.job.t==='b')c[v.job.id]=(c[v.job.id]||0)+1;return c}
 const wcount=b=>S.vill.reduce((n,v)=>n+(v.job&&v.job.t==='b'&&v.job.id===b.id?1:0),0);
@@ -477,7 +499,7 @@ function econ(dt,apply){
   const d={},add=(r,a)=>d[r]=(d[r]||0)+a;
   const cnt=workerCounts(), hf=S.res.food<=0.001?.5:1, pw={};
   for(const v of S.vill)if(v.job&&v.job.t==='b'){const bb=byId(v.job.id);pw[v.job.id]=(pw[v.job.id]||0)+1+(v.edu===2?(bb&&bb.type==='scholar'?1:.3):v.edu===1?.15:0)}
-  {let sup=0,dem=0;for(const b of S.buildings){if(isSite(b))continue;const dd=B[b.type];if(b.type==='power'){const w=cnt[b.id]||0;if(w&&S.res.wood>1)sup+=8*b.level*Math.min(1,w/slots(b))}else if(dd.slots&&b.type!=='uni'&&b.type!=='garage')dem++}
+  {let sup=0,dem=0;for(const b of S.buildings){if(isSite(b))continue;const dd=B[b.type];if(b.type==='power'){const w=cnt[b.id]||0;if(w&&(S.res.wood>1||(S.tech.incinerate&&S.res.trash>1)))sup+=8*b.level*Math.min(1,w/slots(b))}else if(dd.slots&&b.type!=='uni'&&b.type!=='garage')dem++}
    PWR=dem?Math.min(1,sup/dem):0;PWR_S=sup;PWR_D=dem;
    VEH=S.buildings.some(b=>b.type==='garage'&&!isSite(b)&&(cnt[b.id]||0)>0&&S.res.tools>.5)}
   for(const b of S.buildings){
@@ -487,14 +509,15 @@ function econ(dt,apply){
     if(def.rare){for(const r in def.prod){const ev=def.prod[r]*mult(b,r)*f*dt;if(!apply){add(r,ev);continue}let n=Math.floor(ev);if(Math.random()<ev-n)n++;if(n){add(r,n);if(liveTick)DFOUND+=n}}}
     else if(def.prod)for(const r in def.prod)add(r,def.prod[r]*mult(b,r)*f*dt);
     if(def.conv){
-      const m=mult(b,null);let ratio=1;
-      for(const r in def.conv.in){const need=def.conv.in[r]*m*f*dt,have=Math.max(0,S.res[r]+(d[r]||0));ratio=Math.min(ratio,need>0?have/need:1)}
-      for(const r in def.conv.in)add(r,-def.conv.in[r]*m*f*dt*ratio);
+      const m=mult(b,null);let ratio=1;const cin=b.type==='power'&&S.tech.incinerate&&S.res.trash+(d.trash||0)>1?{trash:.4}:def.conv.in;
+      for(const r in cin){const need=cin[r]*m*f*dt,have=Math.max(0,S.res[r]+(d[r]||0));ratio=Math.min(ratio,need>0?have/need:1)}
+      for(const r in cin)add(r,-cin[r]*m*f*dt*ratio);
       for(const r in def.conv.out)add(r,def.conv.out[r]*m*f*dt*ratio);
       if(apply&&def.track)S.made[def.track]=(S.made[def.track]||0)+ratio*f*dt;
     }
   }
   add('food',-S.vill.length*FOOD_PER*dt);
+  if(!apply&&S.dirt>1)add('trash',Math.min(TR_COL+TR_SW,trashGen()+S.dirt/dt)*dt);
   {const tg=taxPerDay();if(tg){add('gold',tg/DAY*dt);if(apply)gLog('🏛️ Steuern',tg/DAY*dt)}}
   if(apply)for(const r in d){if(d[r]>0){S.made[r]=(S.made[r]||0)+d[r];if(r!=='research')S.xp+=d[r]*.1}S.res[r]=Math.max(0,Math.min(cap(r),S.res[r]+d[r]))}
   return d;
@@ -530,6 +553,7 @@ function tick(dt,live){
   selfBuildTick(dt,live);
   idleTick(dt,live);
   gDecay(dt);
+  trashTick(dt,live);
   moodTick(dt,live);
   bankTick(dt,live);
   heroTick(dt,live);
@@ -944,6 +968,7 @@ function updV(v,dt){
     }
     if(v.asleep){v.asleep=false;v.tx=null;v.wait=Math.random()*2}
     if(v.wait>0){v.wait-=dt;return}
+    if(v.tx==null&&v.role==='s'){const hs=S.buildings.filter(b=>b.type==='house'&&!isSite(b));if(hs.length){const b=hs[Math.floor(Math.random()*hs.length)];v.tx=Math.max(.3,Math.min(W-.3,b.x+.5+(Math.random()-.5)*1.6));v.ty=Math.max(.3,Math.min(H-.3,b.y+1.15))}}
     if(v.tx==null&&!v.kid&&(v.role==='t'||festOn())){const st=v.role==='t'?S.buildings.find(b=>b.type==='stall'&&!isSite(b)):S.buildings[0];if(st){v.tx=Math.max(.3,Math.min(W-.3,st.x+.5+(Math.random()-.5)*2.6));v.ty=Math.max(.3,Math.min(H-.3,st.y+.5+(Math.random()-.5)*2.6))}}
     if(v.tx==null&&seasonIdx()===3&&Math.random()<.5){const ws=S.buildings.filter(b=>B[b.type].wjoy&&!isSite(b));if(ws.length){const st=ws[Math.floor(Math.random()*ws.length)];v.tx=Math.max(.3,Math.min(W-.3,st.x+.5+(Math.random()-.5)*1.8));v.ty=Math.max(.3,Math.min(H-.3,st.y+1.2))}}
     if(v.tx==null){const sc=v.kid&&v.seat&&S.buildings.find(b=>b.type==='school'&&!isSite(b)),hs=S.buildings.filter(b=>B[b.type].house&&!isSite(b)),hp=v.home&&byId(v.home),h=sc||(hp&&B[hp.type].house?hp:hs[Math.floor(Math.random()*hs.length)]);v.tx=Math.max(.3,Math.min(W-.3,h.x+.5+(Math.random()-.5)*3));v.ty=Math.max(.3,Math.min(H-.3,h.y+.5+(Math.random()-.5)*3))}
@@ -1082,6 +1107,12 @@ function drawTile(c,x,y){
 let floats=[];
 function floatTxt(x,y,t){floats.push({x,y,t,a:0})}
 const FUNC=['#c0392b','#2e86c1','#27ae60','#8e44ad','#e67e22','#d4ac0d'];
+let DLV=0;
+function drawBags(b){const n=Math.min(3,Math.ceil(DLV*3)),px=b.x*T,py=b.y*T;
+  for(let i=0;i<n;i++){const x=px+T*(.12+((b.id*7+i*5)%10)/12),y=py+T*(.86+(i%2)*.06);
+    ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(x,y+3,4,1.5,0,0,7);ctx.fill();
+    ctx.fillStyle=i%2?'#3d4a2c':'#2e3a24';ctx.beginPath();ctx.ellipse(x,y,3.6,3.2,0,0,7);ctx.fill();
+    ctx.fillStyle='#5a6a40';ctx.beginPath();ctx.moveTo(x-1.3,y-2.6);ctx.lineTo(x,y-4.6);ctx.lineTo(x+1.3,y-2.6);ctx.fill()}}
 function drawBig(b){
   const d=B[b.type],w=fpW(b.type)*T-4,h=fpH(b.type)*T-4,px=b.x*T+2,py=b.y*T+2,site=isSite(b),win=seasonIdx()===3;
   ctx.fillStyle='rgba(0,0,0,.25)';rr(ctx,px+2,py+3,w,h,7);ctx.fill();
@@ -1210,6 +1241,8 @@ function thought(v){
   if(v.job&&v.job.t==='g')o.push('Das ist schwer!','Gleich hab ich’s!');
   if(v.job&&v.job.t==='h')o.push('Mit anpacken! 🔨','Gemeinsam geht’s schneller!');
   if(!v.job&&v.role==='w')o.push('Alles ruhig im Dorf 🛡️','Ich halte die Augen offen 👀');
+  if(!v.job&&v.role==='s')o.push('Hier fegen, da fegen 🧹','Ordnung muss sein!');
+  if(dirtLvl()>.4)o.push('Überall liegt Müll! 🤢','Wer räumt hier mal auf? 🗑️','Das stinkt zum Himmel …');
   if(!v.job&&v.role==='t')o.push('Frische Ware! Kauft ein! 🛒','Ein gutes Geschäft!');
   if(seasonIdx()===3&&S.buildings.some(b=>b.type==='rodel'&&!isSite(b)))o.push('Ab auf die Rodelbahn! 🛷','Wer ist schneller unten? 🛷');
   if(seasonIdx()===3&&S.buildings.some(b=>b.type==='skate'&&!isSite(b)))o.push('Eislaufen macht so Spaß! ⛸️','Ich drehe noch eine Runde ⛸️');
@@ -1293,7 +1326,8 @@ function render(dt){
   }
   const cnt=workerCounts();
   drawXmas();
-  for(const b of S.buildings)if(vis(b.x,b.y)||(B[b.type].fw&&vis(b.x+fpW(b.type)-1,b.y+fpH(b.type)-1))){if(placing&&placing.move===b.id)ctx.globalAlpha=.35;drawBuilding(b,cnt);ctx.globalAlpha=1;if(demoMode&&demoTarget&&demoTarget.k==='b'&&demoTarget.id===b.id){ctx.fillStyle='rgba(255,60,40,.45)';ctx.fillRect(b.x*T,b.y*T,T*fpW(b.type),T*fpH(b.type));ctx.font=`${T*.5}px sans-serif`;ctx.fillText('❌',(b.x+fpW(b.type)/2)*T,(b.y+fpH(b.type)/2)*T)}}
+  DLV=dirtLvl();
+  for(const b of S.buildings)if(vis(b.x,b.y)||(B[b.type].fw&&vis(b.x+fpW(b.type)-1,b.y+fpH(b.type)-1))){if(placing&&placing.move===b.id)ctx.globalAlpha=.35;drawBuilding(b,cnt);if(b.type==='house'&&DLV>.12&&!isSite(b))drawBags(b);ctx.globalAlpha=1;if(demoMode&&demoTarget&&demoTarget.k==='b'&&demoTarget.id===b.id){ctx.fillStyle='rgba(255,60,40,.45)';ctx.fillRect(b.x*T,b.y*T,T*fpW(b.type),T*fpH(b.type));ctx.font=`${T*.5}px sans-serif`;ctx.fillText('❌',(b.x+fpW(b.type)/2)*T,(b.y+fpH(b.type)/2)*T)}}
   const vs=S.vill.filter(v=>vis(v.x,v.y)).sort((a,b)=>a.y-b.y);
   for(const v of vs)if(!v.asleep&&!(v.job&&v.job.t==='x'))drawV(v);
   drawHero();
@@ -1458,7 +1492,7 @@ function sheetResearch(){
     h+=`<div class="item ${done?'done':need.length||gl?'locked':''}"><div class="ic">${r.i}</div><div class="tx"><b>${r.n}</b><small>${r.desc}</small><div class="cost">${done?'Erforscht':gl?'📖 Geschichte: '+gateTxt(k):need.length?'🔒 Benötigt: '+need.map(n=>R[n].n).join(', '):costHtml(r.cost)+(r.edu?`<span class="${eduCount()>=r.edu?'':'miss'}">🎓 ${eduCount()}/${r.edu} Gelehrte</span>`:'')}</div></div>${right}</div>`}
   return h;
 }
-function jobText(v){if(v.job&&v.job.t==='x')return `🗺️ Auf Erkundung (noch ${Math.max(1,Math.ceil((v.job.until-S.gt)/60))} Min.)`;if(v.job&&v.job.t==='h'){const b=byId(v.job.id);return '🚧 Bauhelfer'+(b?': '+B[b.type].i+' '+B[b.type].n:'')}if(v.asleep)return '😴 Schläft';if(v.kid)return v.seat?'🏫 Schulkind':'🧒 Spielt';if(v.job&&v.job.t==='c')return '🔨 Baut mit an einem Haus';if(!v.job&&v.role==='w')return '🛡️ Dorfwache';if(!v.job&&v.role==='t')return '🛒 Straßenhändler';if(!v.job&&festOn())return '🎉 Feiert das Dorffest';if(!v.job)return '🚶 Hat gerade frei';if(v.job.t==='i')return '🔍 Untersucht einen geheimnisvollen Ort';if(v.job.t==='g'){const nd=NODE[S.tiles[v.job.x+v.job.y*W]];return '🧺 Sammelt '+(nd?RES[nd.r].n:'')}const b=byId(v.job.id);return b?'👷 Arbeitet: '+B[b.type].i+' '+B[b.type].n:'—'}
+function jobText(v){if(v.job&&v.job.t==='x')return `🗺️ Auf Erkundung (noch ${Math.max(1,Math.ceil((v.job.until-S.gt)/60))} Min.)`;if(v.job&&v.job.t==='h'){const b=byId(v.job.id);return '🚧 Bauhelfer'+(b?': '+B[b.type].i+' '+B[b.type].n:'')}if(v.asleep)return '😴 Schläft';if(v.kid)return v.seat?'🏫 Schulkind':'🧒 Spielt';if(v.job&&v.job.t==='c')return '🔨 Baut mit an einem Haus';if(!v.job&&v.role==='w')return '🛡️ Dorfwache';if(!v.job&&v.role==='t')return '🛒 Straßenhändler';if(!v.job&&v.role==='s')return '🧹 Straßenfeger';if(!v.job&&festOn())return '🎉 Feiert das Dorffest';if(!v.job)return '🚶 Hat gerade frei';if(v.job.t==='i')return '🔍 Untersucht einen geheimnisvollen Ort';if(v.job.t==='g'){const nd=NODE[S.tiles[v.job.x+v.job.y*W]];return '🧺 Sammelt '+(nd?RES[nd.r].n:'')}const b=byId(v.job.id);return b?'👷 Arbeitet: '+B[b.type].i+' '+B[b.type].n:'—'}
 const bar=(l,v)=>`<div class="bar"><span>${l}</span><div><i style="width:${Math.round(Math.max(0,Math.min(1,v))*100)}%"></i></div><b>${Math.round(Math.max(0,Math.min(1,v))*100)} %</b></div>`;
 function sheetV(v){
   const Hp=happy(),m=Math.max(0,Math.min(1,Hp.total+v.mo));
@@ -1485,6 +1519,10 @@ function sheetVillage(){
   h+=`<p>🍎 Nahrung: <b class="${fr<0?'miss':''}">${fr>=0?'+':'−'}${f1(fr)}/Min</b> (jeder Bewohner isst ${f1(FOOD_PER*60)}/Min)</p>`;
   const hl=homeless();if(hl>0)h+=`<p class="miss">🏚️ ${hl} Bewohner ohne Wohnung! ${S.selfBuild!==false?(canPay(B.house.cost)?'Die Bewohner bauen sich selbst Häuser.':'Für Selbstbau fehlen 12 🪵 / 4 🪨 – sonst ziehen sie nach und nach weg.'):'Sie ziehen nach und nach weg.'}</p>`;
   h+=goldStat();
+  {const dl=dirtLvl(),gen=trashGen()*60,col=(TR_COL+TR_SW)*60;
+   h+=`<div class="item" style="display:block;padding:8px 10px"><b>🗑️ Sauberkeit: ${Math.round((1-dl)*100)} %</b>${bar('Sauberkeit',1-dl)}
+   <small>Es entsteht ${f1(gen)} Müll/Min. · eingesammelt bis ${f1(col)}/Min. (Müllmänner ${f1(TR_COL*60)}, Straßenfeger ${f1(TR_SW*60)}) · herumliegend: ${fmt(S.dirt||0)}<br>
+   Zufriedenheit: −${Math.round(dl*25)} %. ${S.res.trash>=cap('trash')-1?'⚠️ Müll-Lager voll! ':''}${!has('dump')&&gen>0?'Baue einen 🚛 Müllplatz!':S.tech.incinerate?'🔥 Das Kraftwerk verbrennt den gesammelten Müll.':S.tech.electricity?'Tipp: Mit 🔥 Müllverbrennung wird Müll zu Strom.':''}</small></div>`}
   h+=sheetPop();
   h+=sheetIdle();
   h+=`<button class="danger" data-act="selfb">🏠 Selbstbau von Häusern: <b>${S.selfBuild!==false?'AN':'AUS'}</b></button>`;
@@ -1538,6 +1576,7 @@ function sheetIdle(){
   const tg=(k,on)=>`<button class="sm" style="min-width:58px;${on?'background:#4f8a2b':'background:#8a7a6a'}" data-act="itog:${k}">${on?'AN':'AUS'}</button>`;
   let h=`<p style="margin-top:12px"><b>🙋 Aufgaben für freie Bewohner</b> <small>(${fr} frei)</small></p>`;
   h+=`<div class="item"><div class="ic">🚧</div><div class="tx"><b>Bauhelfer</b><small>Freie Bewohner helfen auf Baustellen (bis 3 pro Baustelle, je +${Math.round(HELP*100)} % Bautempo). Aktiv: ${hp}</small></div>${tg('help',I.help)}</div>`;
+  h+=`<div class="item"><div class="ic">🧹</div><div class="tx"><b>Straßenfeger</b><small>Tagsüber sammeln bis zu ${Math.ceil(adults()/10)} freie Bewohner herumliegenden Müll auf (je ${SWEEP_C*60} pro Min.). Aktiv: ${S.vill.filter(v=>v.role==='s').length}</small></div>${tg('sweep',I.sweep!==false)}</div>`;
   const sec=S.sec==null?1:S.sec;
   h+=`<div class="item"><div class="ic">🛡️</div><div class="tx"><b>Dorfwache</b><small>Nachts patrouillieren ${guardNeed()} freie Bewohner statt zu schlafen. Schützt vor Dieben, gibt Freude. Sicherheit: ${Math.round(sec*100)} %${isNight()?` · Wachen: ${gd}`:''}</small></div>${tg('guard',I.guard)}</div>`;
   h+=`<div class="item"><div class="ic">🛒</div><div class="tx"><b>Straßenhändler</b><small>${has('stall')?`Bis ${1+stallLv()} freie Bewohner verkaufen tagsüber Überschuss (Lager über 80 %, außer Nahrung) – wie auf dem Markt sinkt dabei der Preis. Heute: +${f1(I.tday===dayNo()?I.tg:0)} 💰${tr?` · Händler: ${tr}`:''}`:'Braucht einen 🏪 Händlerstand.'}</small></div>${tg('trade',I.trade)}</div>`;
@@ -1573,7 +1612,7 @@ function sheetBuilding(b){
     if(isSite(b))return h+`<button class="danger" data-act="demo:${b.id}">${demoConfirm===b.id?'⚠️ Sicher? Nochmal tippen':'✖ Baustelle abbrechen (alles zurück)'}</button>`;
   }
   if(b.type==='school'&&!isSite(b)){const n=S.vill.filter(v=>v.kid).length;h+=`<p>🏫 Plätze: ${S.buildings.filter(x=>x.type==='school'&&!isSite(x)).reduce((a,x)=>a+6*x.level,0)} · Kinder im Dorf: ${n}</p>`}
-  if(b.type==='power'&&!isSite(b))h+=`<p>⚡ Strom: ${Math.round(PWR_S)} für ${PWR_D} Betriebe → +${Math.round(PWR*25)} % Produktion</p>`;
+  if(b.type==='power'&&!isSite(b))h+=`<p>⚡ Strom: ${Math.round(PWR_S)} für ${PWR_D} Betriebe → +${Math.round(PWR*25)} % Produktion</p><p>🔥 Brennstoff: ${S.tech.incinerate&&S.res.trash>1?'🗑️ Müll':'🪵 Holz'}${S.tech.incinerate?'':' <small>(Müll mit „Müllverbrennung“)</small>'}</p>`;
   if(b.type==='garage'&&!isSite(b))h+=`<p>🛻 ${VEH?'Fuhrwerke unterwegs: +40 % Tempo, +2 beim Sammeln':'Steht still – braucht Arbeiter und Werkzeug'}</p>`;
   if(b.type==='uni'&&!isSite(b))h+='<p class="desc">Nur Bewohner mit Schulabschluss 🎒 können studieren. Nach dem Studium werden sie automatisch frei.</p>';
   if(b.type==='bank'&&!isSite(b))h+=`<p>🏦 Limit: ${bankCap()} Gold · Kredit bis ${loanMax()}</p><button class="big" style="background:#6a7a8a" data-act="bank">🏦 Zur Bank</button>`;
@@ -1627,7 +1666,7 @@ function renderGoal(){
 }
 function updateUI(){
   const rt=econ(60,false),ore=S.tech.mining||S.res.ore>0||zonesCount()>1;
-  const show={gold:has('stall')||S.res.gold>0,wood:1,stone:1,food:1,grain:S.tech.farm||S.res.grain>0,flour:S.tech.milling||S.res.flour>0,planks:S.tech.sawmill||S.res.planks>0,ore,iron:S.tech.smelting||S.res.iron>0,tools:S.tech.smithing||S.res.tools>0,research:1,diamond:S.tech.gemcraft||S.res.diamond>0};
+  const show={gold:has('stall')||S.res.gold>0,wood:1,stone:1,food:1,grain:S.tech.farm||S.res.grain>0,flour:S.tech.milling||S.res.flour>0,planks:S.tech.sawmill||S.res.planks>0,ore,iron:S.tech.smelting||S.res.iron>0,tools:S.tech.smithing||S.res.tools>0,research:1,diamond:S.tech.gemcraft||S.res.diamond>0,trash:has('dump')||S.res.trash>0};
   let h='';
   for(const r in RES){if(!show[r])continue;const v=S.res[r],d=rt[r]||0,full=v>=cap(r)-.01;
     h+=`<div class="chip ${full?'full':''} ${r==='food'&&v<=0.001?'warn':''} ${r==='gold'&&has('stall')?'click':''}" ${r==='gold'&&has('stall')?'data-act="trade"':''}><span>${RES[r].i}</span><b>${fmt(v)}</b>${Math.abs(d)>=.05?`<small class="${d<0?'neg':''}">${d>0?'+':'−'}${f1(d)}/m</small>`:''}</div>`}
@@ -1635,6 +1674,7 @@ function updateUI(){
   const nk=S.vill.length-adults();h+=`<div class="chip ${homeless()>0?'warn':''}"><span>👥</span><b>${adults()}/${popCap()}</b><small>${nk?'+'+nk+'🧒 ':''}${idle} frei</small></div>`;
   if(S.hero)h+=`<div class="chip click" data-act="hero"><span>${HEROES[S.hero.c].i}</span><b>${heroStatus()}</b></div>`;
   if(festOn())h+=`<div class="chip click" data-act="nav:village"><span>🎉</span><b>Fest</b></div>`;
+  if(S.vill.length>15){const dl=dirtLvl();if(dl>.05)h+=`<div class="chip click ${dl>.5?'warn':''}" data-act="nav:village"><span>🤢</span><b>${Math.round(dl*100)}%</b><small>Müll</small></div>`}
   if(S.rs)h+=`<div class="chip click" data-act="nav:research"><span>🔬</span><b>${Math.ceil(S.rs.t/resSpeed()/60)}m</b></div>`;
   const li=lvInfo();h+=`<div class="chip"><span>⭐</span><b>Lv ${li.L}</b><small>${Math.floor(li.x/li.n*100)}%</small></div>`;
   const Hp=happy(),dk=darkness();h+=`<div class="chip"><span>${moodI(Hp.total)}</span><b>${Math.round(Hp.total*100)}%</b></div><div class="chip"><span>${SEAS[seasonIdx()].i}</span><b>Tag ${dayNo()}</b><small>${dk>.35?'🌙':dk>0?'🌆':'☀️'}</small></div>`;
@@ -1745,7 +1785,7 @@ function act(a,p){
     case 'bye':{const n=+p;const fr=freeV().sort((a,c)=>(a.partner?1:0)-(c.partner?1:0));if(fr.length<n){toast('Nicht genug freie Bewohner');return}
       for(const v of fr.slice(0,n))leaveV(v,false);toast(`👋 ${n} Bewohner ${n>1?'sind':'ist'} freundlich weitergezogen.`);renderSheet();save();break}
     case 'fwshow':closeSheet();startFireworks(true);break;
-    case 'itog':{const I=idleCfg();I[p]=!I[p];if(p==='trade'&&I.trade&&!has('stall'))toast('Baue zuerst einen 🏪 Händlerstand');renderSheet();save();break}
+    case 'itog':{const I=idleCfg();if(p==='sweep')I.sweep=I.sweep===false;else I[p]=!I[p];if(p==='trade'&&I.trade&&!has('stall'))toast('Baue zuerst einen 🏪 Händlerstand');renderSheet();save();break}
     case 'fest':{const fc=festCost();if(festOn()||(S.festCD||0)>S.gt||freeV().length<5||!canPay(fc)){toast('Fest gerade nicht möglich');return}pay(fc);S.fest=S.gt+FEST_T;S.festCD=S.gt+FEST_CD;for(const v of freeV())v.tx=null;gainXP(30);toast('🎉 Das Dorffest beginnt! Alle feiern am Lagerfeuer.');renderSheet();save();break}
     case 'explore':{const fr=freeV();if(!fr.length||S.res.food<15||S.vill.filter(v=>v.job&&v.job.t==='x').length>=EXP_MAX){toast('Gerade kein Erkunder verfügbar');return}const v=fr[Math.floor(Math.random()*fr.length)];S.res.food-=15;v.job={t:'x',until:S.gt+EXP_T};v.tx=null;v.role=null;toast(`🗺️ ${v.name} zieht los, um die Gegend zu erkunden!`);renderSheet();save();break}
     case 'mclose':$('modal').classList.remove('on');break;
