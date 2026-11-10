@@ -440,8 +440,8 @@ function idleTick(dt,live){
   if(ti){I.tt=(I.tt||0)+dt;
     if(I.tt>=20){const k=Math.floor(I.tt/20);I.tt-=20*k;let g=0;
       for(const r in PRICE){if(r==='diamond'||r==='food')continue;const c=cap(r),lim=c*.8;if(!isFinite(c)||S.res[r]<=lim)continue;
-        const n=Math.min(S.res[r]-lim,2*ti*k);if(n<.5)continue;S.res[r]-=n;g+=n*sellP(r)*.85}
-      if(g>0){if(I.tday!==dayNo()){I.tday=dayNo();I.tg=0}I.tg+=g;earn(g)}}}
+        const n=Math.min(S.res[r]-lim,ti*k);if(n<.5)continue;const m=S.mkt[r];if(m.f<=.55)continue;const f0=m.f,f1=Math.max(.4,f0-pDrop(r,n));g+=PRICE[r]*(f0+f1)/2*n*tradeBonus()*.8;m.f=f1;S.res[r]-=n}
+      if(g>0){if(I.tday!==dayNo()){I.tday=dayNo();I.tg=0}I.tg+=g;GSRC='🛒 Straßenhändler';earn(g);GSRC=null}}}
 }
 function exploreLoot(v,live){
   const L=lvInfo().L,got={},pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -452,7 +452,7 @@ function exploreLoot(v,live){
     else if(x<.38)got.gold=(got.gold||0)+Math.round(15+L*6+Math.random()*25);
     else{const r=pick(pool);got[r]=(got[r]||0)+Math.max(3,Math.round((25+L*5)*(.6+Math.random()*.8)/Math.sqrt(PRICE[r])))}};
   one();if(Math.random()<.35)one();
-  for(const r in got)addRes(r,got[r]);gainXP(20);
+  GSRC='🗺️ Erkunder';for(const r in got)addRes(r,got[r]);GSRC=null;gainXP(20);
   const txt=Object.keys(got).map(r=>`+${got[r]} ${RES[r].i}`).join(' ');
   const I=idleCfg();I.log.unshift(`🗺️ ${v.name} kam zurück: ${txt}`);I.log=I.log.slice(0,5);
   if(live)toast(`🗺️ ${v.name} ist von der Erkundung zurück: ${txt}${got.diamond?' – ein Diamant! 💎':''}`);
@@ -491,11 +491,14 @@ function econ(dt,apply){
     }
   }
   add('food',-S.vill.length*FOOD_PER*dt);
-  {const tg=taxPerDay();if(tg)add('gold',tg/DAY*dt)}
+  {const tg=taxPerDay();if(tg){add('gold',tg/DAY*dt);if(apply)gLog('🏛️ Steuern',tg/DAY*dt)}}
   if(apply)for(const r in d){if(d[r]>0){S.made[r]=(S.made[r]||0)+d[r];if(r!=='research')S.xp+=d[r]*.1}S.res[r]=Math.max(0,Math.min(cap(r),S.res[r]+d[r]))}
   return d;
 }
-function addRes(r,a){S.res[r]=Math.min(cap(r),S.res[r]+a);S.made[r]=(S.made[r]||0)+a}
+let GSRC=null;
+function gLog(src,g){if(!(g>0))return;if(!S.gs)S.gs={};S.gs[src]=(S.gs[src]||0)+g}
+function gDecay(dt){if(!S.gs)return;const f=Math.exp(-dt/3600);for(const k in S.gs){S.gs[k]*=f;if(S.gs[k]<.5)delete S.gs[k]}}
+function addRes(r,a){S.res[r]=Math.min(cap(r),S.res[r]+a);S.made[r]=(S.made[r]||0)+a;if(r==='gold')gLog(GSRC||'🎁 Belohnungen & Sonstiges',a)}
 function canPay(c){for(const r in c)if((S.res[r]||0)<c[r])return false;return true}
 function pay(c){for(const r in c)S.res[r]-=c[r]}
 function costHtml(c){return Object.keys(c).map(r=>`<span class="${(S.res[r]||0)>=c[r]?'':'miss'}">${RES[r].i} ${c[r]}</span>`).join('')}
@@ -522,6 +525,7 @@ function tick(dt,live){
   familyTick(dt,live);
   selfBuildTick(dt,live);
   idleTick(dt,live);
+  gDecay(dt);
   moodTick(dt,live);
   bankTick(dt,live);
   heroTick(dt,live);
@@ -562,7 +566,7 @@ function tradeBonus(){const st=S.buildings.filter(b=>b.type==='stall'&&!isSite(b
 const sellP=r=>PRICE[r]*S.mkt[r].f*tradeBonus();
 const buyP=r=>PRICE[r]*S.mkt[r].f*2.2/Math.max(1,tradeBonus());
 function earn(g){addRes('gold',g);gainXP(g*.2)}
-function doSell(r,n){n=Math.min(n,Math.floor(S.res[r]));if(n<=0||!tradeBonus())return;const m=S.mkt[r],f0=m.f,f1=Math.max(.4,f0-pDrop(r,n)),g=PRICE[r]*(f0+f1)/2*n*tradeBonus();m.f=f1;S.res[r]-=n;earn(g);toast(`💰 ${n} ${RES[r].n} verkauft: +${f1_(g)} Gold`)}
+function doSell(r,n){n=Math.min(n,Math.floor(S.res[r]));if(n<=0||!tradeBonus())return;const m=S.mkt[r],f0=m.f,f1=Math.max(.4,f0-pDrop(r,n)),g=PRICE[r]*(f0+f1)/2*n*tradeBonus();m.f=f1;S.res[r]-=n;GSRC='🏪 Markt-Verkauf';earn(g);GSRC=null;toast(`💰 ${n} ${RES[r].n} verkauft: +${f1_(g)} Gold`)}
 function doBuy(r,n){if(!tradeBonus())return;n=Math.min(n,Math.floor(cap(r)-S.res[r]));if(n<=0){toast('Lager ist voll');return}const g=buyP(r)*n;if(S.res.gold<g){toast('Nicht genug Gold');return}S.res.gold-=g;addRes(r,n);S.mkt[r].f=Math.min(1.8,S.mkt[r].f+pDrop(r,n));toast(`🛒 ${n} ${RES[r].n} gekauft: −${f1_(g)} Gold`)}
 const f1_=n=>f1(n);
 function marketTick(dt,live){
@@ -583,7 +587,7 @@ function spawnTrader(){
 }
 function sheetTrade(){
   const tb=tradeBonus();
-  let h=`<h3>🏪 Markt</h3><p>💰 Gold: <b>${fmt(S.res.gold)}</b></p>`;
+  let h=`<h3>🏪 Markt</h3><p>💰 Gold: <b>${fmt(S.res.gold)}</b></p>`+goldStat();
   if(!tb)return h+'<p class="note">Baue zuerst einen 🏪 Händlerstand.</p>';
   h+=`<p class="desc">Preisbonus: ×${f1(tb)}. Preise ändern sich jeden Tag. Wer viel auf einmal verkauft, drückt den Preis – er erholt sich mit der Zeit.</p>`;
   for(const r in PRICE){
@@ -1473,6 +1477,7 @@ function sheetVillage(){
   h+=`<p>💕 Paare: <b>${Math.floor(pr)}</b> · 🧒 Kinder: <b>${ns}</b> · 🎒 Gebildet: <b>${S.vill.filter(v=>v.edu===1).length}</b> · 🎓 Gelehrte: <b>${eduCount()}</b></p>`;
   h+=`<p>🍎 Nahrung: <b class="${fr<0?'miss':''}">${fr>=0?'+':'−'}${f1(fr)}/Min</b> (jeder Bewohner isst ${f1(FOOD_PER*60)}/Min)</p>`;
   const hl=homeless();if(hl>0)h+=`<p class="miss">🏚️ ${hl} Bewohner ohne Wohnung! ${S.selfBuild!==false?(canPay(B.house.cost)?'Die Bewohner bauen sich selbst Häuser.':'Für Selbstbau fehlen 12 🪵 / 4 🪨 – sonst ziehen sie nach und nach weg.'):'Sie ziehen nach und nach weg.'}</p>`;
+  h+=goldStat();
   h+=sheetPop();
   h+=sheetIdle();
   h+=`<button class="danger" data-act="selfb">🏠 Selbstbau von Häusern: <b>${S.selfBuild!==false?'AN':'AUS'}</b></button>`;
@@ -1497,6 +1502,11 @@ function sheetVillage(){
   for(const b of S.buildings){const d=B[b.type];h+=`<div class="item" data-act="openb:${b.id}"><div class="ic">${d.i}</div><div class="tx"><b>${d.n}</b> <span class="lv">St. ${b.level}</span><small>${d.slots?'👷 '+(cnt[b.id]||0)+'/'+slots(b):d.house?'🛏️ '+beds(b)+' Plätze':d.joy?'🎉 +'+d.joy*b.level+' Freude':''}</small></div></div>`}
   return h;
 }
+function goldStat(){const g=S.gs||{},ks=Object.keys(g).sort((a,b)=>g[b]-g[a]),tot=ks.reduce((a,k)=>a+g[k],0);
+  let h=`<div class="item" style="display:block;padding:8px 10px"><b>📊 Gold-Einnahmen (ca. letzte Stunde): ${fmt(tot)} 💰</b>`;
+  if(!ks.length)h+='<small>Noch keine Einnahmen.</small>';
+  for(const k of ks)h+=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:3px"><span>${k}</span><b>+${fmt(g[k])}</b></div>`;
+  return h+'</div>'}
 function taxInfo(){
   const r=taxRate(),t=happy().total,pen=taxPen(),st=t<LEAVE_AT?['😠','Abwanderung! Bewohner ziehen weg','#c0392b']:t<LEAVE_AT+.1?['😟','Unmut – kurz vor der Abwanderung','#d07a1a']:t<.6?['🙂','Zufrieden','#4f8a2b']:['😄','Sehr zufrieden','#2e7d32'];
   return `<p style="margin:4px 0">Satz: <b>${f1(r)} 💰</b> pro Kopf → <b>+${f1(taxPerDay(r))} Gold/Tag</b></p>
@@ -1523,7 +1533,7 @@ function sheetIdle(){
   h+=`<div class="item"><div class="ic">🚧</div><div class="tx"><b>Bauhelfer</b><small>Freie Bewohner helfen auf Baustellen (bis 3 pro Baustelle, je +${Math.round(HELP*100)} % Bautempo). Aktiv: ${hp}</small></div>${tg('help',I.help)}</div>`;
   const sec=S.sec==null?1:S.sec;
   h+=`<div class="item"><div class="ic">🛡️</div><div class="tx"><b>Dorfwache</b><small>Nachts patrouillieren ${guardNeed()} freie Bewohner statt zu schlafen. Schützt vor Dieben, gibt Freude. Sicherheit: ${Math.round(sec*100)} %${isNight()?` · Wachen: ${gd}`:''}</small></div>${tg('guard',I.guard)}</div>`;
-  h+=`<div class="item"><div class="ic">🛒</div><div class="tx"><b>Straßenhändler</b><small>${has('stall')?`Bis ${1+stallLv()} freie Bewohner verkaufen tagsüber Überschuss (Lager über 80 %, außer Nahrung) für Gold. Heute: +${f1(I.tday===dayNo()?I.tg:0)} 💰${tr?` · Händler: ${tr}`:''}`:'Braucht einen 🏪 Händlerstand.'}</small></div>${tg('trade',I.trade)}</div>`;
+  h+=`<div class="item"><div class="ic">🛒</div><div class="tx"><b>Straßenhändler</b><small>${has('stall')?`Bis ${1+stallLv()} freie Bewohner verkaufen tagsüber Überschuss (Lager über 80 %, außer Nahrung) – wie auf dem Markt sinkt dabei der Preis. Heute: +${f1(I.tday===dayNo()?I.tg:0)} 💰${tr?` · Händler: ${tr}`:''}`:'Braucht einen 🏪 Händlerstand.'}</small></div>${tg('trade',I.trade)}</div>`;
   const fc=festCost(),cd=(S.festCD||0)-S.gt;
   if(festOn())h+=`<div class="item" style="border:2px solid #e0a526"><div class="ic">🎉</div><div class="tx"><b>Dorffest läuft!</b><small>+40 % Freude · noch ${Math.ceil((S.fest-S.gt)/60)} Min.</small></div></div>`;
   else h+=`<div class="item"><div class="ic">🎉</div><div class="tx"><b>Dorffest</b><small>Ab 5 freien Bewohnern: 1 Tag lang +40 % Freude. ${cd>0?`Nächstes Fest in ${Math.ceil(cd/60)} Min.`:costHtml(fc)}</small></div><button class="sm" data-act="fest" ${cd<=0&&fr>=5&&canPay(fc)?'':'disabled'}>Feiern</button></div>`;
@@ -1720,7 +1730,7 @@ function act(a,p){
     case 'sell':{const [r,n]=p.split(':');doSell(r,+n);renderSheet();checkGoals();break}
     case 'buy':{const [r,n]=p.split(':');doBuy(r,+n);renderSheet();break}
     case 'toffer':{const t=S.trader,o=t&&t.offers[+p];if(!o||o.done)return;
-      if(o.k==='buy'){if(S.res[o.r]<o.n)return;S.res[o.r]-=o.n;earn(o.g)}
+      if(o.k==='buy'){if(S.res[o.r]<o.n)return;S.res[o.r]-=o.n;GSRC='🧳 Fahrender Händler';earn(o.g);GSRC=null}
       else{if(S.res.gold<o.g)return;S.res.gold-=o.g;if(o.k==='sell')addRes(o.r,o.n);else addRes('research',o.n)}
       o.done=1;toast('🤝 Handel abgeschlossen!');renderSheet();checkGoals();save();break}
     case 'dsite':{const b=byId(+p);if(!b||!(b.cs>0))return;const c=dCost(b.self?b.cs/(.5*Math.max(1,S.vill.filter(v=>v.job&&v.job.t==='c'&&v.job.id===b.id).length)):b.cs/bSpeed());if(S.res.diamond<c){toast('Nicht genug Diamanten 💎');return}S.res.diamond-=c;b.cs=0;if(b.self)for(const v of S.vill)if(v.job&&v.job.t==='c'&&v.job.id===b.id){v.job=null;v.tx=null;v.atC=false}if(S.hero&&S.hero.atSite===b.id)S.hero.atSite=null;completeSite(b,true);toast(`💎 −${c} Diamanten: sofort fertig!`);renderSheet();break}
