@@ -107,7 +107,7 @@ const RES={
   wood:{n:'Holz',i:'🪵'}, stone:{n:'Stein',i:'🪨'}, food:{n:'Nahrung',i:'🍎'},
   grain:{n:'Getreide',i:'🌾'}, flour:{n:'Mehl',i:'🥣'},
   planks:{n:'Bretter',i:'🪚'}, ore:{n:'Erz',i:'⛏️'}, iron:{n:'Eisen',i:'⚙️'}, tools:{n:'Werkzeuge',i:'🔧'},
-  research:{n:'Forschung',i:'🔬'}, gold:{n:'Gold',i:'💰'}
+  research:{n:'Forschung',i:'🔬'}, gold:{n:'Gold',i:'💰'}, diamond:{n:'Diamanten',i:'💎'}
 };
 const THEMES=['berg','wald','berg','see','start','wald','berg','wiese','see'];
 const THEME_N={start:'Lichtung',wald:'Dichter Wald',berg:'Erzberge',see:'Seenland',wiese:'Blumenwiese'};
@@ -138,6 +138,8 @@ const B={
   bank:{n:'Bank',i:'🏦',roof:'#6a7a8a',cost:{stone:40,planks:30,gold:50},req:'banking',desc:'Sparkonto, Festgeld und Kredite. Jede Stufe erhöht die maximale Anlagesumme.'},
   stall:{n:'Händlerstand',i:'🏪',roof:'#d08a3a',cost:{wood:20,stone:10},desc:'Hier verkaufst du Waren für Gold und kaufst ein. Jede Stufe: +8 % bessere Preise. Lockt den fahrenden Händler an.'},
   tavern:{n:'Taverne',i:'🍺',roof:'#8a4a2a',cost:{wood:30,stone:15},joy:4,req:'s_tavern',lockT:'🔒 Geschichte: Kapitel 1',desc:'Hildegards Taverne: +4 Freude pro Stufe. Hier werden Geschichten erzählt.'},
+  diamondmine:{n:'Diamantmine',i:'💎',roof:'#3a6a8a',cost:{planks:30,stone:40,iron:15,tools:8,gold:80},slots:2,prod:{diamond:.0011},rare:1,near:OR,r:2,req:'gemcraft',desc:'Gräbt tief nach Diamanten – Funde sind selten! Braucht eine Erzader im Radius 2 (Erzberge). Diamanten 💎 beschleunigen Bauten und Forschung, kaufen Elite-Technik und bringen auf dem Markt viel Gold.'},
+  jeweler:{n:'Juwelier',i:'💍',roof:'#8a3a7a',cost:{stone:40,planks:30,gold:100},joy:10,req:'jewelry',desc:'Schmuck aus Diamanten: +10 Freude pro Stufe. Braucht Diamanten 💎 zum Bau.'},
   monument:{n:'Mondkristall-Denkmal',i:'🔮',roof:'#4a4a8a',cost:{stone:60,iron:10,gold:100},joy:12,req:'s_monument',lockT:'🔒 Geschichte: Kapitel 7',desc:'Erinnert an Eichenhall: +12 Freude pro Stufe.'}
 };
 const R={
@@ -163,10 +165,15 @@ Object.assign(R,{
   agri2:{n:'Fruchtfolge',i:'🌱',cost:{research:120,gold:120},need:['milling'],desc:'+25 % Nahrung und Getreide.'},
   mining2:{n:'Tiefbau',i:'🪨',cost:{research:150,gold:150,tools:10},need:['mining','tools2'],desc:'+25 % Stein und Erz.'},
   arch1:{n:'Baukunst',i:'🏛️',cost:{research:180,gold:250,planks:100},need:['tools2'],desc:'Gebäude bis Stufe 7 (wenn genug Zonen frei sind).'},
+  gemcraft:{n:'Edelsteinkunde',i:'💎',cost:{research:100,gold:120,tools:10},need:['smithing'],desc:'Schaltet die Diamantmine frei.'},
+  gemcraft2:{n:'Diamantbohrer',i:'🔩',cost:{research:180,gold:200},need:['gemcraft','tools2'],desc:'Elite-Technik: +50 % Diamanten, +15 % Stein und Erz. Kostet Diamanten.'},
+  jewelry:{n:'Juwelierkunst',i:'💍',cost:{research:150,gold:200},need:['gemcraft','market'],desc:'Schaltet den Juwelier frei (viel Freude). Kostet Diamanten.'},
+  diamondtools:{n:'Diamantwerkzeuge',i:'🛠️',cost:{research:300,gold:400,tools:20},need:['gemcraft2','tools3'],desc:'Elite-Technik: +20 % auf alle Produktion. Kostet Diamanten.'},
   arch2:{n:'Meisterbaukunst',i:'🏰',cost:{research:450,gold:600,tools:40},need:['arch1','vehicles'],edu:6,desc:'Gebäude bis Stufe 10.'}
 });
 for(const k in R){const c=R[k].cost;for(const r in c)c[r]=Math.round(c[r]*(r==='research'?3:r==='gold'?2.5:2))}
 for(const k in B){if(B[k].cost)B[k].cost0=Object.assign({},B[k].cost);if(['camp','house','gatherer','woodcutter','quarry','flowerbed'].includes(k)||!B[k].cost)continue;const c=B[k].cost;for(const r in c)c[r]=Math.round(c[r]*2.5)}
+R.gemcraft2.cost.diamond=6;R.jewelry.cost.diamond=4;R.diamondtools.cost.diamond=15;R.arch2.cost.diamond=10;B.jeweler.cost.diamond=3;B.jeweler.cost0.diamond=3;
 const resTime=r=>Math.round(120+r.cost.research*5);
 const resSpeed=()=>Math.min(2,1+.05*eduCount());
 const GOALS=[
@@ -293,6 +300,8 @@ const has=t=>S.buildings.some(b=>b.type===t&&!isSite(b));
 const sumC=c=>Object.values(c).reduce((a,b)=>a+b,0);
 const buildTime=c=>Math.round(Math.min(600,15+.8*sumC(c)));
 const upTime=c=>Math.round(Math.min(2400,30+.5*sumC(c)));
+const dCost=sec=>Math.max(1,Math.ceil(sec/180));
+const dBtn=(act,sec)=>{const c=dCost(sec);return `<button class="sm" style="background:#2f6f9a" data-act="${act}" ${S.res.diamond>=c?'':'disabled'}>💎 Sofort fertig (${c} 💎)</button> `};
 const bSpeed=()=>S.hero&&S.hero.c==='brunolf'?1.35:1;
 const heroName=()=>S.hero?HEROES[S.hero.c].n:'Held';
 function nextSite(){let best=null;for(const b of S.buildings)if(b.cs>0&&!b.self&&(!best||(b.qs||0)<(best.qs||0)))best=b;return best}
@@ -365,7 +374,7 @@ function genMap(seed){
 let S;
 function newGame(){
   const seed=(Math.random()*1e9)|0;
-  S={v:1,seed,time:Date.now(),res:{wood:15,stone:5,food:15,grain:0,flour:0,planks:0,ore:0,iron:0,tools:0,research:0,gold:0},
+  S={v:1,seed,time:Date.now(),res:{wood:15,stone:5,food:15,grain:0,flour:0,planks:0,ore:0,iron:0,tools:0,research:0,gold:0,diamond:0},
      buildings:[],vill:[],zones:[0,0,0,0,1,0,0,0,0],tech:{},nid:1,spawnT:0,flags:{},made:{},goal:0,gt:90,tv:2,xp:0,story:{ch:0,on:0,st:0,pages:[],mk:{},nt:-1}};
   S.tiles=genMap(seed);
   S.amt=S.tiles.map(t=>NODE[t]?NODE[t].max:0);
@@ -398,9 +407,9 @@ const slots=b=>B[b.type].slots?B[b.type].slots+(b.level-1):0;
 function countNear(x,y,t,r){let n=0;for(let yy=y-r;yy<=y+r;yy++)for(let xx=x-r;xx<=x+r;xx++){if(inMap(xx,yy)&&S.tiles[xx+yy*W]===t&&Math.hypot(xx-x,yy-y)<=r+.5)n++}return n}
 function effAt(type,x,y){const d=B[type];if(d.near==null)return 1;const n=countNear(x,y,d.near,d.r);return n===0?0:Math.min(1,.4+n*.15)}
 const eff=b=>effAt(b.type,b.x,b.y);
-function mult(b,r){let m=1+.5*(b.level-1);if(S.tech.tools1&&(r==='wood'||r==='stone'))m*=1.2;if(S.tech.tools2)m*=1.3;if(S.tech.tools3)m*=1.25;if(hasRoad(b))m*=1.1;if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))m*=1+.25*PWR;if(S.story&&S.story.bless)m*=1.15;const hc=S.hero&&S.hero.c;if(hc==='thordis'&&r==='wood')m*=1.1;if(hc==='elmiran'&&r==='food')m*=1.15;if(hc==='zara'&&r==='research')m*=1.25;if(S.tech.agri2&&(r==='food'||r==='grain'))m*=1.25;if(S.tech.mining2&&(r==='stone'||r==='ore'))m*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))m*=1.15;m*=.8+.4*happy().total;if(B[b.type].season&&(r==='food'||r==='grain'))m*=SEAS[seasonIdx()].food;return m}
+function mult(b,r){let m=1+.5*(b.level-1);if(S.tech.tools1&&(r==='wood'||r==='stone'))m*=1.2;if(S.tech.tools2)m*=1.3;if(S.tech.tools3)m*=1.25;if(S.tech.diamondtools)m*=1.2;if(S.tech.gemcraft2){if(r==='diamond')m*=1.5;if(r==='stone'||r==='ore')m*=1.15}if(hasRoad(b))m*=1.1;if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))m*=1+.25*PWR;if(S.story&&S.story.bless)m*=1.15;const hc=S.hero&&S.hero.c;if(hc==='thordis'&&r==='wood')m*=1.1;if(hc==='elmiran'&&r==='food')m*=1.15;if(hc==='zara'&&r==='research')m*=1.25;if(S.tech.agri2&&(r==='food'||r==='grain'))m*=1.25;if(S.tech.mining2&&(r==='stone'||r==='ore'))m*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))m*=1.15;m*=.8+.4*happy().total;if(B[b.type].season&&(r==='food'||r==='grain'))m*=SEAS[seasonIdx()].food;return m}
 const hasRoad=b=>[[1,0],[-1,0],[0,1],[0,-1]].some(([a,c])=>inMap(b.x+a,b.y+c)&&S.road[b.x+a+(b.y+c)*W]);
-function cap(r){if(r==='research'||r==='gold')return Infinity;let c=100;for(const b of S.buildings)if(B[b.type].cap&&!isSite(b))c+=B[b.type].cap*b.level;return c}
+function cap(r){if(r==='research'||r==='gold'||r==='diamond')return Infinity;let c=100;for(const b of S.buildings)if(B[b.type].cap&&!isSite(b))c+=B[b.type].cap*b.level;return c}
 function popCap(){let c=0;for(const b of S.buildings)c+=beds(b);return c}
 function econ(dt,apply){
   const d={},add=(r,a)=>d[r]=(d[r]||0)+a;
@@ -413,7 +422,8 @@ function econ(dt,apply){
     const def=B[b.type],w=cnt[b.id]||0;if(!w||isSite(b))continue;
     const e=eff(b);if(!e)continue;
     const f=(pw[b.id]||w)*e*hf;
-    if(def.prod)for(const r in def.prod)add(r,def.prod[r]*mult(b,r)*f*dt);
+    if(def.rare){for(const r in def.prod){const ev=def.prod[r]*mult(b,r)*f*dt;if(!apply){add(r,ev);continue}let n=Math.floor(ev);if(Math.random()<ev-n)n++;if(n){add(r,n);if(liveTick)DFOUND+=n}}}
+    else if(def.prod)for(const r in def.prod)add(r,def.prod[r]*mult(b,r)*f*dt);
     if(def.conv){
       const m=mult(b,null);let ratio=1;
       for(const r in def.conv.in){const need=def.conv.in[r]*m*f*dt,have=Math.max(0,S.res[r]+(d[r]||0));ratio=Math.min(ratio,need>0?have/need:1)}
@@ -443,11 +453,12 @@ function upCost(b){
 function zoneCost(){const n=zonesCount(),c={wood:80*n,stone:50*n};if(n>=2)c.planks=40*(n-1);if(n>=4)c.iron=20*(n-3);if(n>=6)c.tools=15*(n-5);if(n>=2)c.gold=100*(n-1);return c}
 function zoneAdj(z){const zx=z%ZN,zy=Math.floor(z/ZN);return [[1,0],[-1,0],[0,1],[0,-1]].some(([a,b])=>{const x=zx+a,y=zy+b;return x>=0&&y>=0&&x<ZN&&y<ZN&&S.zones[x+y*ZN]})}
 
-let liveTick=false,lastSea=-1;
+let liveTick=false,lastSea=-1,DFOUND=0;
 function tick(dt,live){
   liveTick=live;
   S.gt+=dt;
   econ(dt,true);
+  if(DFOUND&&live){toast(`💎 Diamantfund! +${DFOUND} Diamant${DFOUND>1?'en':''}`);DFOUND=0}else DFOUND=0;
   marketTick(dt,live);
   if(S.rs){S.rs.t-=dt*resSpeed();if(S.rs.t<=0){const k=S.rs.k;S.rs=null;S.tech[k]=1;gainXP(40);if(live){toast(`🔬 ${R[k].n} erforscht!`);checkGoals();if(sheetKind==='research'||sheetKind==='build')renderSheet()}}}
   familyTick(dt,live);
@@ -485,13 +496,14 @@ function catchUp(show){
 }
 
 // ======================= MARKT =======================
-const PRICE={wood:.5,stone:.6,food:.4,grain:.8,flour:1.5,planks:1.6,ore:2,iron:5,tools:12};
+const PRICE={wood:.5,stone:.6,food:.4,grain:.8,flour:1.5,planks:1.6,ore:2,iron:5,tools:12,diamond:90};
+const pDrop=(r,n)=>r==='diamond'?n*.04:n*PRICE[r]/400;
 function tradeBonus(){const st=S.buildings.filter(b=>b.type==='stall'&&!isSite(b));if(!st.length)return 0;let m=1+.08*(Math.max(...st.map(b=>b.level))-1);if(S.tech.market)m*=1.1;if(S.hero&&S.hero.c==='zara')m*=1.15;return m}
 const sellP=r=>PRICE[r]*S.mkt[r].f*tradeBonus();
 const buyP=r=>PRICE[r]*S.mkt[r].f*2.2/Math.max(1,tradeBonus());
 function earn(g){addRes('gold',g);gainXP(g*.2)}
-function doSell(r,n){n=Math.min(n,Math.floor(S.res[r]));if(n<=0||!tradeBonus())return;const m=S.mkt[r],f0=m.f,f1=Math.max(.4,f0-n*PRICE[r]/400),g=PRICE[r]*(f0+f1)/2*n*tradeBonus();m.f=f1;S.res[r]-=n;earn(g);toast(`💰 ${n} ${RES[r].n} verkauft: +${f1_(g)} Gold`)}
-function doBuy(r,n){if(!tradeBonus())return;n=Math.min(n,Math.floor(cap(r)-S.res[r]));if(n<=0){toast('Lager ist voll');return}const g=buyP(r)*n;if(S.res.gold<g){toast('Nicht genug Gold');return}S.res.gold-=g;addRes(r,n);S.mkt[r].f=Math.min(1.8,S.mkt[r].f+n*PRICE[r]/400);toast(`🛒 ${n} ${RES[r].n} gekauft: −${f1_(g)} Gold`)}
+function doSell(r,n){n=Math.min(n,Math.floor(S.res[r]));if(n<=0||!tradeBonus())return;const m=S.mkt[r],f0=m.f,f1=Math.max(.4,f0-pDrop(r,n)),g=PRICE[r]*(f0+f1)/2*n*tradeBonus();m.f=f1;S.res[r]-=n;earn(g);toast(`💰 ${n} ${RES[r].n} verkauft: +${f1_(g)} Gold`)}
+function doBuy(r,n){if(!tradeBonus())return;n=Math.min(n,Math.floor(cap(r)-S.res[r]));if(n<=0){toast('Lager ist voll');return}const g=buyP(r)*n;if(S.res.gold<g){toast('Nicht genug Gold');return}S.res.gold-=g;addRes(r,n);S.mkt[r].f=Math.min(1.8,S.mkt[r].f+pDrop(r,n));toast(`🛒 ${n} ${RES[r].n} gekauft: −${f1_(g)} Gold`)}
 const f1_=n=>f1(n);
 function marketTick(dt,live){
   for(const r in S.mkt){const m=S.mkt[r];m.f+=Math.sign(m.t-m.f)*Math.min(Math.abs(m.t-m.f),.0005*dt)}
@@ -501,11 +513,12 @@ function marketTick(dt,live){
   if(S.trader&&S.gt>S.trader.until){S.trader=null;if(live)toast('🧳 Der Händler ist weitergezogen.')}
 }
 function spawnTrader(){
-  const pool=Object.keys(PRICE).filter(r=>['wood','stone','food'].includes(r)||S.res[r]>5||S.made[r]>0);
+  const pool=Object.keys(PRICE).filter(r=>r!=='diamond').filter(r=>['wood','stone','food'].includes(r)||S.res[r]>5||S.made[r]>0);
   const pick=a=>a[Math.floor(Math.random()*a.length)],offers=[];
   for(let k=0;k<2;k++){const r=pick(pool),n=Math.max(5,Math.round((15+Math.random()*30)/Math.sqrt(PRICE[r])));offers.push({k:'buy',r,n,g:Math.round(n*PRICE[r]*2.2)})}
   const rr=pick(['planks','iron','tools','ore']),n=5+Math.floor(Math.random()*10);offers.push({k:'sell',r:rr,n,g:Math.round(n*PRICE[rr]*1.3)});
   offers.push({k:'fp',n:25,g:45});
+  if(S.tech.gemcraft&&Math.random()<.6){const n=1+Math.floor(Math.random()*3);offers.push(Math.random()<.6?{k:'buy',r:'diamond',n,g:Math.round(n*PRICE.diamond*1.4)}:{k:'sell',r:'diamond',n,g:Math.round(n*PRICE.diamond*1.8)})}
   S.trader={until:S.gt+DAY/2,offers};
 }
 function sheetTrade(){
@@ -514,8 +527,10 @@ function sheetTrade(){
   if(!tb)return h+'<p class="note">Baue zuerst einen 🏪 Händlerstand.</p>';
   h+=`<p class="desc">Preisbonus: ×${f1(tb)}. Preise ändern sich jeden Tag. Wer viel auf einmal verkauft, drückt den Preis – er erholt sich mit der Zeit.</p>`;
   for(const r in PRICE){
-    if(!(S.res[r]>0||S.made[r]>0||['wood','stone','food'].includes(r)))continue;
+    if(!(S.res[r]>0||S.made[r]>0||['wood','stone','food'].includes(r)||(r==='diamond'&&S.tech.gemcraft)))continue;
     const f=S.mkt[r].f,ar=f>1.1?'📈':f<.9?'📉':'➖',sp=sellP(r),bp=buyP(r),have=Math.floor(S.res[r]),half=Math.floor(have/2);
+    if(r==='diamond'){h+=`<div class="item" style="display:block;padding:7px 8px;border:2px solid #4aa3d8"><div style="display:flex;justify-content:space-between;align-items:center"><b>💎 Diamanten <small style="display:inline">(${have})</small></b><span>${ar} <b>${f1(sp)}</b> 💰/Stk</span></div>
+    <div class="row" style="margin-top:5px"><button class="sm" data-act="sell:diamond:1" ${have>=1?'':'disabled'}>−1 (+${f1(sp)})</button><button class="sm" data-act="sell:diamond:5" ${have>=5?'':'disabled'}>−5</button><button class="sm" style="background:#7a5a2a" data-act="buy:diamond:1" ${S.res.gold>=bp?'':'disabled'}>+1 (−${f1(bp)})</button></div></div>`;continue}
     h+=`<div class="item" style="display:block;padding:7px 8px"><div style="display:flex;justify-content:space-between;align-items:center"><b>${RES[r].i} ${RES[r].n} <small style="display:inline">(${have})</small></b><span>${ar} <b>${f1(sp)}</b> 💰/Stk</span></div>
     <div class="row" style="margin-top:5px"><button class="sm" data-act="sell:${r}:10" ${have>=10?'':'disabled'}>−10 (+${f1(sp*10)})</button><button class="sm" data-act="sell:${r}:${half}" ${half>=1?'':'disabled'}>Hälfte (${half})</button><button class="sm" style="background:#7a5a2a" data-act="buy:${r}:10" ${S.res.gold>=bp*10?'':'disabled'}>+10 (−${f1(bp*10)})</button></div></div>`;
   }
@@ -1240,7 +1255,7 @@ function sheetBuild(){
 }
 function sheetResearch(){
   let h=`<h3>🔬 Forschung</h3><p class="desc">Forschungspunkte: <b>${fmt(S.res.research)}</b> – erzeugt im Gelehrtenhaus. Es läuft immer nur eine Forschung; jeder Gelehrte 🎓 beschleunigt sie um 5 % (aktuell ×${f1(resSpeed())}).</p>`;
-  if(S.rs){const r=R[S.rs.k];h+=`<div class="item" style="display:block;border:2px solid #7c6cf0"><b>${r.i} ${r.n} wird erforscht …</b>`+bar('Fortschritt',1-S.rs.t/S.rs.T)+`<p>⏳ Noch ${Math.ceil(S.rs.t/resSpeed()/60)} Min.</p><button class="sm" style="background:#a04a2a" data-act="rcancel">✖ Abbrechen (alles zurück)</button></div>`}
+  if(S.rs){const r=R[S.rs.k];h+=`<div class="item" style="display:block;border:2px solid #7c6cf0"><b>${r.i} ${r.n} wird erforscht …</b>`+bar('Fortschritt',1-S.rs.t/S.rs.T)+`<p>⏳ Noch ${Math.ceil(S.rs.t/resSpeed()/60)} Min.</p>`+dBtn('dres',S.rs.t/resSpeed())+`<button class="sm" style="background:#a04a2a" data-act="rcancel">✖ Abbrechen (alles zurück)</button></div>`}
   for(const k in R){const r=R[k],done=S.tech[k],need=(r.need||[]).filter(n=>!S.tech[n]);
     let right;
     if(done)right='<b style="color:#4f8a2b">✔</b>';
@@ -1311,9 +1326,10 @@ function sheetMenu(){
 function sheetBuilding(b){
   const d=B[b.type],w=wcount(b),sl=slots(b),mL=maxLevel();
   let h=`<h3>${d.i} ${d.n} <span class="lv">Stufe ${b.level}</span></h3><p class="desc">${d.desc}</p>`;
-  if(b.cs>0&&b.self){const n=S.vill.filter(v=>v.job&&v.job.t==='c'&&v.job.id===b.id).length;h+=`<div class="item" style="display:block;border:2px solid #e0a526"><b>🚧 Die Bewohner bauen selbst</b>`+bar('Fortschritt',1-b.cs/b.ct)+`<p>👷 ${n} Helfer · noch ca. ${n?Math.ceil(b.cs/(.5*n)):'?'} s</p></div>`;return h}
+  if(b.cs>0&&b.self){const n=S.vill.filter(v=>v.job&&v.job.t==='c'&&v.job.id===b.id).length;h+=`<div class="item" style="display:block;border:2px solid #e0a526"><b>🚧 Die Bewohner bauen selbst</b>`+bar('Fortschritt',1-b.cs/b.ct)+`<p>👷 ${n} Helfer · noch ca. ${n?Math.ceil(b.cs/(.5*n)):'?'} s</p>`+dBtn('dsite:'+b.id,b.cs/(.5*Math.max(1,n)))+`</div>`;return h}
   if(b.cs>0){const first=nextSite()===b,here=S.hero&&S.hero.atSite===b.id;
     h+=`<div class="item" style="display:block;border:2px solid #e0a526"><b>🚧 ${b.up?'Ausbau auf Stufe '+(b.level+1):'Baustelle'}</b>`+bar('Fortschritt',1-b.cs/b.ct)+`<p>⏳ Noch ${Math.ceil(b.cs/bSpeed())} s · ${here?'🔨 '+heroName()+' arbeitet hier':first?'🚶 '+heroName()+' ist unterwegs':'⏸️ In der Warteschlange'}</p>`;
+    h+=dBtn('dsite:'+b.id,b.cs/bSpeed());
     if(!first)h+=`<button class="sm" data-act="hfirst:${b.id}">⚡ Als Nächstes bauen</button> `;
     if(b.up)h+=`<button class="sm" style="background:#a04a2a" data-act="ucancel:${b.id}">✖ Ausbau abbrechen</button>`;
     h+='</div>';
@@ -1374,7 +1390,7 @@ function renderGoal(){
 }
 function updateUI(){
   const rt=econ(60,false),ore=S.tech.mining||S.res.ore>0||zonesCount()>1;
-  const show={gold:has('stall')||S.res.gold>0,wood:1,stone:1,food:1,grain:S.tech.farm||S.res.grain>0,flour:S.tech.milling||S.res.flour>0,planks:S.tech.sawmill||S.res.planks>0,ore,iron:S.tech.smelting||S.res.iron>0,tools:S.tech.smithing||S.res.tools>0,research:1};
+  const show={gold:has('stall')||S.res.gold>0,wood:1,stone:1,food:1,grain:S.tech.farm||S.res.grain>0,flour:S.tech.milling||S.res.flour>0,planks:S.tech.sawmill||S.res.planks>0,ore,iron:S.tech.smelting||S.res.iron>0,tools:S.tech.smithing||S.res.tools>0,research:1,diamond:S.tech.gemcraft||S.res.diamond>0};
   let h='';
   for(const r in RES){if(!show[r])continue;const v=S.res[r],d=rt[r]||0,full=v>=cap(r)-.01;
     h+=`<div class="chip ${full?'full':''} ${r==='food'&&v<=0.001?'warn':''} ${r==='gold'&&has('stall')?'click':''}" ${r==='gold'&&has('stall')?'data-act="trade"':''}><span>${RES[r].i}</span><b>${fmt(v)}</b>${Math.abs(d)>=.05?`<small class="${d<0?'neg':''}">${d>0?'+':'−'}${f1(d)}/m</small>`:''}</div>`}
@@ -1486,6 +1502,8 @@ function act(a,p){
       if(o.k==='buy'){if(S.res[o.r]<o.n)return;S.res[o.r]-=o.n;earn(o.g)}
       else{if(S.res.gold<o.g)return;S.res.gold-=o.g;if(o.k==='sell')addRes(o.r,o.n);else addRes('research',o.n)}
       o.done=1;toast('🤝 Handel abgeschlossen!');renderSheet();checkGoals();save();break}
+    case 'dsite':{const b=byId(+p);if(!b||!(b.cs>0))return;const c=dCost(b.self?b.cs/(.5*Math.max(1,S.vill.filter(v=>v.job&&v.job.t==='c'&&v.job.id===b.id).length)):b.cs/bSpeed());if(S.res.diamond<c){toast('Nicht genug Diamanten 💎');return}S.res.diamond-=c;b.cs=0;if(b.self)for(const v of S.vill)if(v.job&&v.job.t==='c'&&v.job.id===b.id){v.job=null;v.tx=null;v.atC=false}if(S.hero&&S.hero.atSite===b.id)S.hero.atSite=null;completeSite(b,true);toast(`💎 −${c} Diamanten: sofort fertig!`);renderSheet();break}
+    case 'dres':{if(!S.rs)return;const c=dCost(S.rs.t/resSpeed());if(S.res.diamond<c){toast('Nicht genug Diamanten 💎');return}S.res.diamond-=c;S.rs.t=0.001;tick(0.01,true);toast(`💎 −${c} Diamanten: Forschung abgeschlossen!`);renderSheet();save();break}
     case 'mclose':$('modal').classList.remove('on');break;
   }
   updateUI();
