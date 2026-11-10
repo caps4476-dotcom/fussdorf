@@ -321,7 +321,7 @@ function happy(){
   if(seasonIdx()===3)jp+=5;
   if(adults()>=6)jp+=5*(S.sec==null?1:S.sec);
   const joy=Math.min(1,jp*2/pop*(S.hero&&S.hero.c==='lyonessa'?1.5:1)+(festOn()?.4:0));
-  return {food,home,joy,total:Math.max(0,.4*food+.3*home+.3*joy-TAX[S.tax==null?1:S.tax].p)};
+  return {food,home,joy,total:Math.max(0,Math.min(1,.4*food+.3*home+.3*joy-taxPen()))};
 }
 const needXP=L=>Math.round(30*Math.pow(L,1.5));
 function lvInfo(){let L=1,x=S.xp;while(x>=needXP(L)){x-=needXP(L);L++}return{L,x,n:needXP(L)}}
@@ -519,6 +519,7 @@ function tick(dt,live){
   familyTick(dt,live);
   selfBuildTick(dt,live);
   idleTick(dt,live);
+  moodTick(dt,live);
   bankTick(dt,live);
   heroTick(dt,live);
   for(let i=0;i<S.rt.length;i++)if(S.rt[i]>0){S.rt[i]-=dt;if(S.rt[i]<=0){S.rt[i]=0;S.amt[i]=NODE[S.tiles[i]].max;dirtyTile(i)}}
@@ -805,8 +806,23 @@ function finishInv(id){
 
 // ======================= FAMILIE & BILDUNG =======================
 const TAX=[{n:'Keine',g:0,p:0},{n:'Niedrig',g:1,p:0},{n:'Mittel',g:2,p:.05},{n:'Hoch',g:3,p:.12}];
-const taxLv=()=>S.tax==null?1:S.tax;
-function taxPerDay(){const t=TAX[taxLv()];let g=0;for(const v of S.vill)if(!v.kid)g+=t.g*(1+.5*(v.edu||0));return g}
+const taxLv=()=>{const r=taxRate();return r<.5?0:r<1.5?1:r<2.5?2:3};
+const TAX_MAX=5,LEAVE_AT=.3;
+function taxRate(){if(S.taxR==null)S.taxR=TAX[S.tax==null?1:S.tax].g;return S.taxR}
+function taxPen(r){r=r==null?taxRate():r;return r<1?-(1-r)*.03:.05*Math.pow(r-1,1.8)}
+function taxPerDay(r){r=r==null?taxRate():r;let g=0;for(const v of S.vill)if(!v.kid)g+=r*(1+.5*(v.edu||0));return g}
+function leaveV(v,live,why){if(v.partner){const pt=S.vill.find(x=>x.id===v.partner);if(pt)pt.partner=null}const b=v.job&&v.job.t==='b'&&byId(v.job.id);if(v.carry)v.carry=null;S.vill=S.vill.filter(x=>x!==v);if(b)reslot(b);if(live)toast(`🚶 ${v.name} hat das Dorf verlassen – ${why}`)}
+function moodTick(dt,live){
+  const t=happy().total;
+  if(t<LEAVE_AT&&adults()>3){
+    S.unT=(S.unT||0)+dt*(1+(LEAVE_AT-t)/LEAVE_AT*2);
+    if(live&&!S.flags.uw){S.flags.uw=1;toast(`😠 Die Bewohner sind unzufrieden (${Math.round(t*100)} %)! Unter ${Math.round(LEAVE_AT*100)} % ziehen sie weg – ${taxPen()>.1?'senke die Steuern!':'sorge für Nahrung, Wohnraum und Freude.'}`)}
+    if(S.unT>=240){S.unT=0;
+      const ad=S.vill.filter(v=>!v.kid),idle=ad.filter(v=>!v.job||v.job.t==='h'),pool=idle.length?idle:ad.filter(v=>!v.job||v.job.t!=='x');
+      const v=pool[Math.floor(Math.random()*pool.length)];
+      if(v){const why=taxPen()>.1&&taxPen()>=.4*(1-t)?'die Steuern sind zu hoch 💸':S.res.food<=.001?'es gibt nichts zu essen 🍎':'zu unzufrieden 😠';leaveV(v,live,why);S.left=(S.left||0)+1}}
+  }else{S.unT=Math.max(0,(S.unT||0)-dt*2);if(t>=LEAVE_AT+.05)S.flags.uw=0}
+}
 const pickA=a=>a[Math.floor(Math.random()*a.length)];
 function familyTick(dt,live){
   const Hp=happy();
@@ -1131,7 +1147,8 @@ function thought(v){
   if(v.partner){const pt=S.vill.find(x=>x.id===v.partner);if(pt)o.push(`Ich denke an ${pt.name} 💕`)}
   if(v.edu===2)o.push('Wissen ist Macht 🎓');
   if(PWR>0)o.push('Strom ist ein Wunder! ⚡');if(VEH)o.push('Mit dem Karren geht’s schneller! 🛻');
-  if(taxLv()>=3)o.push('Diese Steuern sind zu hoch! 😠','Schon wieder zahlen …');else if(taxLv()===0)o.push('Keine Steuern – herrlich! 😊');
+  {const tp=taxPen();if(tp>.2)o.push('Diese Steuern sind unverschämt! 😠','Ich packe bald meine Sachen …','Wovon soll ich leben? 💸');else if(tp>.08)o.push('Die Steuern sind ganz schön hoch …','Schon wieder zahlen …');else if(taxRate()<.5)o.push('Keine Steuern – herrlich! 😊');}
+  if(happy().total<LEAVE_AT)o.push('Hier halte ich es nicht mehr lange aus …','Woanders ist es bestimmt besser.');
   if(Hp.joy<.3)o.push('Hier ist es etwas trist…','Ein Brunnen wäre schön ⛲');
   if(Hp.total>.75)o.push('Ich liebe dieses Dorf! 😊','Schönes Leben hier!');
   if(homeless()>0)o.push('Ich brauche ein Dach über dem Kopf 🏠','Es wird eng hier…');
@@ -1295,6 +1312,7 @@ let lastSheet='',sheetKind=null,sheetArg=null,demoConfirm=null,newConfirm=false;
 function openSheet(k,a){if(k!==sheetKind||a!==sheetArg){demoConfirm=null;newConfirm=false}sheetKind=k;sheetArg=a;lastSheet='';renderSheet();$('sheet').classList.add('open');$('sheet').scrollTop=0}
 function closeSheet(){sheetKind=null;$('sheet').classList.remove('open')}
 function renderSheet(){
+  if(taxDrag&&sheetKind==='village')return;
   const el=$('sc');let h='';
   switch(sheetKind){
     case 'build':h=sheetBuild();break;
@@ -1366,11 +1384,12 @@ function sheetVillage(){
   else if(S.res.food<5)h+='<p class="note">Neue Bewohner kommen nur, wenn genug Nahrung (5+) da ist.</p>';
   else h+=`<p class="desc">Nächster Bewohner in ca. ${Math.ceil(SPAWN_T-S.spawnT)} s.</p>`;
   const Hp=happy(),SE=SEAS[seasonIdx()];
-  h+=`<p style="margin-top:10px"><b>${moodI(Hp.total)} Zufriedenheit ${Math.round(Hp.total*100)} %</b> → Produktion ×${f1(.8+.4*Hp.total)}</p>`;
+  h+=`<p id="moodl" style="margin-top:10px"><b>${moodI(Hp.total)} Zufriedenheit ${Math.round(Hp.total*100)} %</b> → Produktion ×${f1(.8+.4*Hp.total)}</p>`;
   h+=bar('🍎 Nahrung',Hp.food)+bar('🏠 Wohnen',Hp.home)+bar('🎉 Freude',Hp.joy);
-  {const tl=taxLv();h+=`<p style="margin-top:8px">💰 <b>Steuern: ${TAX[tl].n}</b> → +${f1(taxPerDay())} Gold pro Tag</p><div class="row" style="gap:5px">`;
-   TAX.forEach((t,i)=>h+=`<button class="sm" style="flex:1;${i===tl?'background:#e0a526;color:#3a2c1a':''}" data-act="tax:${i}">${t.n}${t.p?`<br><small>−${Math.round(t.p*100)} % 😊</small>`:''}</button>`);
-   h+='</div><p class="desc">Jeder Erwachsene zahlt pro Tag; Gebildete 1,5×, Gelehrte 2×. Hohe Steuern drücken die Zufriedenheit.</p>'}
+  h+=`<div class="item" style="display:block;padding:9px 10px;margin-top:8px"><b>💰 Steuern</b><div id="taxinfo">${taxInfo()}</div>
+   <input type="range" id="taxr" min="0" max="${TAX_MAX}" step="0.1" value="${taxRate()}" style="width:100%;margin:8px 0 2px;accent-color:#e0a526">
+   <div style="display:flex;justify-content:space-between;font-size:12px;opacity:.75"><span>0 · keine</span><span>2,5</span><span>${TAX_MAX} · maximal</span></div>
+   <p class="desc">Gold pro Erwachsenem und Tag (Gebildete 1,5×, Gelehrte 2×). Unter 1 Gold freuen sich die Bewohner, darüber steigt der Unmut immer schneller. Fällt die Zufriedenheit unter ${Math.round(LEAVE_AT*100)} %, ziehen nach und nach Bewohner weg.</p></div>`;
   h+='<p class="desc">Wohnen steigt mit höheren Hausstufen, Freude mit Blumenbeeten, Brunnen und Marktplätzen.</p>';
   const nx=SEAS[(seasonIdx()+1)%4];
   h+=`<p>${SE.i} ${SE.n}, Tag ${dayNo()} – Nahrung aus Feldern, Sammeln & Fischen ×${f1(SE.food)}</p><p class="desc">${nx.i} ${nx.n} beginnt in ca. ${Math.ceil(seasonLeft()/60)} Min.${nx.n==='Winter'?' – denk an Vorräte und Lagerplatz!':''}</p>`;
@@ -1382,6 +1401,13 @@ function sheetVillage(){
   for(const b of S.buildings){const d=B[b.type];h+=`<div class="item" data-act="openb:${b.id}"><div class="ic">${d.i}</div><div class="tx"><b>${d.n}</b> <span class="lv">St. ${b.level}</span><small>${d.slots?'👷 '+(cnt[b.id]||0)+'/'+slots(b):d.house?'🛏️ '+beds(b)+' Plätze':d.joy?'🎉 +'+d.joy*b.level+' Freude':''}</small></div></div>`}
   return h;
 }
+function taxInfo(){
+  const r=taxRate(),t=happy().total,pen=taxPen(),st=t<LEAVE_AT?['😠','Abwanderung! Bewohner ziehen weg','#c0392b']:t<LEAVE_AT+.1?['😟','Unmut – kurz vor der Abwanderung','#d07a1a']:t<.6?['🙂','Zufrieden','#4f8a2b']:['😄','Sehr zufrieden','#2e7d32'];
+  return `<p style="margin:4px 0">Satz: <b>${f1(r)} 💰</b> pro Kopf → <b>+${f1(taxPerDay(r))} Gold/Tag</b></p>
+   <p style="margin:2px 0">Wirkung auf Zufriedenheit: <b style="color:${pen>0?'#c0392b':'#2e7d32'}">${pen>0?'−':'+'}${Math.round(Math.abs(pen)*100)} %</b></p>
+   <p style="margin:2px 0;color:${st[2]}"><b>${st[0]} ${Math.round(t*100)} % – ${st[1]}</b></p>${S.left?`<p class="desc">Bisher weggezogen: ${S.left}</p>`:''}`;
+}
+let taxDrag=false;
 function sheetIdle(){
   const I=idleCfg(),fr=freeV().length,hp=S.vill.filter(v=>v.job&&v.job.t==='h').length,ex=S.vill.filter(v=>v.job&&v.job.t==='x'),gd=S.vill.filter(v=>v.role==='w').length,tr=S.vill.filter(v=>v.role==='t').length;
   const tg=(k,on)=>`<button class="sm" style="min-width:58px;${on?'background:#4f8a2b':'background:#8a7a6a'}" data-act="itog:${k}">${on?'AN':'AUS'}</button>`;
@@ -1571,7 +1597,7 @@ function act(a,p){
     case 'hgather':{const h=S.hero;if(!h)return;heroFree();h.cmd='gather';h.job={t:'g',x:sheetArg.x,y:sheetArg.y};h.ph='go';closeSheet();toast(`${HEROES[h.c].i} ${heroName().split(' ')[0]} geht sammeln`);break}
     case 'hinv':{const m=activeMarker();if(!m||!S.hero)return;heroFree();const h=S.hero;h.cmd='inv';h.inv={id:m.st.id,x:m.x,y:m.y};h.ph='go';closeSheet();toast(`🔍 ${heroName().split(' ')[0]} macht sich auf den Weg`);break}
     case 'rcancel':{if(!S.rs)return;const r=R[S.rs.k];for(const x in r.cost)addRes(x,r.cost[x]);S.rs=null;toast('Forschung abgebrochen – alles zurück');renderSheet();break}
-    case 'tax':S.tax=+p;toast(`💰 Steuern: ${TAX[S.tax].n}`);renderSheet();break;
+    case 'tax':S.taxR=TAX[+p].g;renderSheet();break;
     case 'selfb':S.selfBuild=S.selfBuild===false;toast(S.selfBuild?'🏠 Bewohner bauen jetzt selbst Häuser':'Selbstbau ausgeschaltet');renderSheet();break;
     case 'trade':openSheet('trade');break;
     case 'bank':openSheet('bank');break;
@@ -1599,6 +1625,10 @@ function act(a,p){
 }
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el||!el.dataset.act||el.disabled)return;const s=el.dataset.act,k=s.indexOf(':');act(k<0?s:s.slice(0,k),k<0?null:s.slice(k+1))});
 $('goal').addEventListener('click',()=>$('goal').classList.toggle('min'));
+document.addEventListener('input',e=>{if(e.target.id!=='taxr')return;taxDrag=true;S.taxR=Math.round(+e.target.value*10)/10;const el=$('taxinfo');if(el)el.innerHTML=taxInfo();{const m=$('moodl'),t=happy().total;if(m)m.innerHTML=`<b>${moodI(t)} Zufriedenheit ${Math.round(t*100)} %</b> → Produktion ×${f1(.8+.4*t)}`}updateUI()});
+document.addEventListener('change',e=>{if(e.target.id!=='taxr')return;taxDrag=false;S.taxR=Math.round(+e.target.value*10)/10;toast(`💰 Steuersatz: ${f1(S.taxR)} Gold pro Kopf`);save();renderSheet()});
+document.addEventListener('pointerdown',e=>{if(e.target.id==='taxr')taxDrag=true});
+document.addEventListener('pointerup',()=>{if(taxDrag){setTimeout(()=>{if(document.activeElement&&document.activeElement.id==='taxr')document.activeElement.blur();taxDrag=false},300)}});
 
 // ======================= START =======================
 function resize(){dpr=Math.min(2,window.devicePixelRatio||1);cv.width=innerWidth*dpr;cv.height=innerHeight*dpr;document.documentElement.style.setProperty('--navh',$('nav').offsetHeight+'px');clampCam()}
