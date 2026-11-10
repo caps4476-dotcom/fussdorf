@@ -176,6 +176,10 @@ Object.assign(R,{
 for(const k in R){const c=R[k].cost;for(const r in c)c[r]=Math.round(c[r]*(r==='research'?3:r==='gold'?2.5:2))}
 for(const k in B){if(B[k].cost)B[k].cost0=Object.assign({},B[k].cost);if(['camp','house','gatherer','woodcutter','quarry','flowerbed'].includes(k)||!B[k].cost)continue;const c=B[k].cost;for(const r in c)c[r]=Math.round(c[r]*2.5)}
 R.gemcraft2.cost.diamond=6;R.jewelry.cost.diamond=4;R.diamondtools.cost.diamond=15;R.arch2.cost.diamond=10;B.jeweler.cost.diamond=3;B.jeweler.cost0.diamond=3;
+const RGATE={mining:1,market:1,schooling:1,smelting:2,milling:2,banking:2,smithing:3,tools2:3,university:3,agri2:3,mining2:4,arch1:4,gemcraft:4,jewelry:4,tools3:5,electricity:5,gemcraft2:5,vehicles:6,diamondtools:6,arch2:7};
+const chDone=()=>S.story?S.story.ch:0;
+const gateOk=k=>chDone()>=(RGATE[k]||0);
+function gateTxt(k){const g=RGATE[k]||0;return g>=STORY.length?'alle Kapitel der Geschichte abschließen':`Kapitel ${g} „${STORY[g-1].t}“ abschließen`}
 const resTime=r=>Math.round(120+r.cost.research*5);
 const resSpeed=()=>Math.min(2,1+.05*eduCount());
 const GOALS=[
@@ -752,6 +756,7 @@ function advanceStep(){
       if(rw.bless)S.story.bless=1;
       if(rw.vill){const cp=S.buildings[0];for(let k=0;k<rw.vill;k++)spawnV(cp.x+.5+(Math.random()-.5)*2,cp.y+1.2+Math.random())}
       S.story.ch++;S.story.on=0;S.story.st=0;
+      {const nu=Object.keys(R).filter(k=>RGATE[k]===S.story.ch&&!S.tech[k]);if(nu.length)setTimeout(()=>toast('🔬 Neue Forschung freigeschaltet: '+nu.map(k=>R[k].i+' '+R[k].n).join(', ')),800)}
       modal(`<div style="text-align:center;font-size:44px">${c.i}</div><h3 style="text-align:center">Kapitel abgeschlossen!</h3><p style="text-align:center"><b>${c.t}</b></p><p>🎁 Belohnung: +${rw.xp} ⭐ XP${rw.txt?' · '+rw.txt:''}</p>${rw.pg!=null?'<p class="desc">📜 Eine neue Tagebuchseite liegt im Geschichtsbuch.</p>':''}<button class="big" data-act="mclose">Weiter</button>`);
       save();updateUI();
     });
@@ -1442,13 +1447,15 @@ function sheetBuild(){
 function sheetResearch(){
   let h=`<h3>🔬 Forschung</h3><p class="desc">Forschungspunkte: <b>${fmt(S.res.research)}</b> – erzeugt im Gelehrtenhaus. Es läuft immer nur eine Forschung; jeder Gelehrte 🎓 beschleunigt sie um 5 % (aktuell ×${f1(resSpeed())}).</p>`;
   if(S.rs){const r=R[S.rs.k];h+=`<div class="item" style="display:block;border:2px solid #7c6cf0"><b>${r.i} ${r.n} wird erforscht …</b>`+bar('Fortschritt',1-S.rs.t/S.rs.T)+`<p>⏳ Noch ${Math.ceil(S.rs.t/resSpeed()/60)} Min.</p>`+dBtn('dres',S.rs.t/resSpeed())+`<button class="sm" style="background:#a04a2a" data-act="rcancel">✖ Abbrechen (alles zurück)</button></div>`}
-  for(const k in R){const r=R[k],done=S.tech[k],need=(r.need||[]).filter(n=>!S.tech[n]);
+  {const nx=Object.keys(R).filter(k=>!S.tech[k]&&!gateOk(k));if(nx.length){const g=Math.min(...nx.map(k=>RGATE[k]));h+=`<div class="item" style="display:block;border:2px solid #b0782a"><b>📖 Weitere Forschungen über die Geschichte</b><small>Nächste Freischaltung: ${gateTxt(nx.find(k=>RGATE[k]===g))} (${nx.filter(k=>RGATE[k]===g).map(k=>R[k].i+' '+R[k].n).join(', ')}).</small><button class="sm" style="margin-top:6px" data-act="nav:story">📖 Zur Geschichte</button></div>`}}
+  for(const k in R){const r=R[k],done=S.tech[k],need=(r.need||[]).filter(n=>!S.tech[n]),gl=!done&&!gateOk(k);
     let right;
     if(done)right='<b style="color:#4f8a2b">✔</b>';
+    else if(gl)right='<b style="font-size:20px">📖</b>';
     else if(need.length)right='';
     else if(S.rs&&S.rs.k===k)right='<b>⏳</b>';
     else right=`<button class="sm" data-act="res:${k}" ${!S.rs&&canPay(r.cost)&&(!r.edu||eduCount()>=r.edu)?'':'disabled'}>Erforschen<br><small>${Math.ceil(resTime(r)/resSpeed()/60)} Min.</small></button>`;
-    h+=`<div class="item ${done?'done':need.length?'locked':''}"><div class="ic">${r.i}</div><div class="tx"><b>${r.n}</b><small>${r.desc}</small><div class="cost">${done?'Erforscht':need.length?'🔒 Benötigt: '+need.map(n=>R[n].n).join(', '):costHtml(r.cost)+(r.edu?`<span class="${eduCount()>=r.edu?'':'miss'}">🎓 ${eduCount()}/${r.edu} Gelehrte</span>`:'')}</div></div>${right}</div>`}
+    h+=`<div class="item ${done?'done':need.length||gl?'locked':''}"><div class="ic">${r.i}</div><div class="tx"><b>${r.n}</b><small>${r.desc}</small><div class="cost">${done?'Erforscht':gl?'📖 Geschichte: '+gateTxt(k):need.length?'🔒 Benötigt: '+need.map(n=>R[n].n).join(', '):costHtml(r.cost)+(r.edu?`<span class="${eduCount()>=r.edu?'':'miss'}">🎓 ${eduCount()}/${r.edu} Gelehrte</span>`:'')}</div></div>${right}</div>`}
   return h;
 }
 function jobText(v){if(v.job&&v.job.t==='x')return `🗺️ Auf Erkundung (noch ${Math.max(1,Math.ceil((v.job.until-S.gt)/60))} Min.)`;if(v.job&&v.job.t==='h'){const b=byId(v.job.id);return '🚧 Bauhelfer'+(b?': '+B[b.type].i+' '+B[b.type].n:'')}if(v.asleep)return '😴 Schläft';if(v.kid)return v.seat?'🏫 Schulkind':'🧒 Spielt';if(v.job&&v.job.t==='c')return '🔨 Baut mit an einem Haus';if(!v.job&&v.role==='w')return '🛡️ Dorfwache';if(!v.job&&v.role==='t')return '🛒 Straßenhändler';if(!v.job&&festOn())return '🎉 Feiert das Dorffest';if(!v.job)return '🚶 Hat gerade frei';if(v.job.t==='i')return '🔍 Untersucht einen geheimnisvollen Ort';if(v.job.t==='g'){const nd=NODE[S.tiles[v.job.x+v.job.y*W]];return '🧺 Sammelt '+(nd?RES[nd.r].n:'')}const b=byId(v.job.id);return b?'👷 Arbeitet: '+B[b.type].i+' '+B[b.type].n:'—'}
@@ -1689,7 +1696,7 @@ function act(a,p){
     case 'sendall':sendGather(sheetArg.x,sheetArg.y,true);renderSheet();break;
     case 'recall':for(const v of S.vill)if(v.job&&v.job.t==='g'){if(v.carry){addRes(v.carry.r,v.carry.a);v.carry=null}v.job=null;v.tx=null}toast('Sammler kommen zurück');renderSheet();break;
     case 'unlock':{const z=+p,c=zoneCost();if(S.zones[z]||!zoneAdj(z)||!canPay(c)){toast('Nicht genug Ressourcen');return}pay(c);S.zones[z]=1;gainXP(100);drawAllTerrain();closeSheet();toast(`🔓 ${THEME_N[THEMES[z]]} freigeschaltet! Max. Ausbaustufe jetzt ${maxLevel()}`);checkGoals();save();break}
-    case 'res':{const r=R[p];if(S.tech[p]||!canPay(r.cost))return;if(r.edu&&eduCount()<r.edu){toast(`Benötigt ${r.edu} Gelehrte 🎓`);return}if(S.rs){toast('Es läuft bereits eine Forschung');return}pay(r.cost);S.rs={k:p,t:resTime(r),T:resTime(r)};toast(`🔬 Forschung „${r.n}“ gestartet (${Math.ceil(resTime(r)/resSpeed()/60)} Min.)`);renderSheet();save();break;gainXP(40);toast(`🔬 ${r.n} erforscht!`);renderSheet();checkGoals();save();break}
+    case 'res':{const r=R[p];if(S.tech[p]||!canPay(r.cost))return;if(!gateOk(p)){toast('📖 Zuerst: '+gateTxt(p));return}if(r.edu&&eduCount()<r.edu){toast(`Benötigt ${r.edu} Gelehrte 🎓`);return}if(S.rs){toast('Es läuft bereits eine Forschung');return}pay(r.cost);S.rs={k:p,t:resTime(r),T:resTime(r)};toast(`🔬 Forschung „${r.n}“ gestartet (${Math.ceil(resTime(r)/resSpeed()/60)} Min.)`);renderSheet();save();break;gainXP(40);toast(`🔬 ${r.n} erforscht!`);renderSheet();checkGoals();save();break}
     case 'openb':{const b=byId(+p);if(b){sel={x:b.x,y:b.y};openSheet('b',b.id);centerOn(b.x,b.y)}break}
     case 'export':{const s=btoa(unescape(encodeURIComponent(serialize())));
       const done=()=>toast('📋 Spielstand kopiert');
