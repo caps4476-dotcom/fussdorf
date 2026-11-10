@@ -532,7 +532,7 @@ function tick(dt,live){
   }else S.spawnT=Math.min(S.spawnT,SPAWN_T);
   if(live){
     S.time=Date.now();
-    const si=seasonIdx();if(si!==lastSea){lastSea=si;drawAllTerrain();toast(si===3?'❄️ Der Winter beginnt – in der Dorfmitte steht der Weihnachtsbaum! 🎄':`${SEAS[si].i} Der ${SEAS[si].n} beginnt!`);S.flags.ww=0}
+    const si=seasonIdx();if(si!==lastSea){const prevS=lastSea;lastSea=si;drawAllTerrain();if(prevS===3&&si===0)startFireworks();toast(si===3?'❄️ Der Winter beginnt – in der Dorfmitte steht der Weihnachtsbaum! 🎄':`${SEAS[si].i} Der ${SEAS[si].n} beginnt!`);S.flags.ww=0}
     if(si===2&&seasonLeft()<300&&!S.flags.ww){S.flags.ww=1;toast('❄️ Der Winter naht! Lege Nahrungsvorräte an.')}
     if(S.res.food<=0.001&&S.vill.length){if(!S.flags.hw){S.flags.hw=1;toast('⚠️ Keine Nahrung! Produktion halbiert – baue Sammlerhütten.')}}else S.flags.hw=0;
     checkGoals();
@@ -1204,6 +1204,7 @@ function thought(v){
   if(!v.job&&v.role==='t')o.push('Frische Ware! Kauft ein! 🛒','Ein gutes Geschäft!');
   if(seasonIdx()===3&&S.buildings.some(b=>b.type==='rodel'&&!isSite(b)))o.push('Ab auf die Rodelbahn! 🛷','Wer ist schneller unten? 🛷');
   if(seasonIdx()===3&&S.buildings.some(b=>b.type==='skate'&&!isSite(b)))o.push('Eislaufen macht so Spaß! ⛸️','Ich drehe noch eine Runde ⛸️');
+  if(fw)return pickA(['Frohes neues Jahr! 🎆','Prost Neujahr! 🥂','Wie schön das funkelt! ✨','Ohhh! 🎇','Aaah! 🎆']);
   if(!v.job&&festOn())o.push('Was für ein Fest! 🎉','Musik und Tanz! 💃','Noch ein Stück Kuchen? 🍰');
   if(v.job&&v.job.t==='i')o.push('Was mag hier verborgen sein? 🔍','Ein seltsamer Ort …');
   if(S.story.ch>0&&!v.job)o.push('Hast du von Eichenhall gehört?','Karak ist ein seltsamer Kauz …','Der Halbmond … was bedeutet er?');
@@ -1228,6 +1229,31 @@ function lifeUpdate(dt){
   if(bubAcc>3.5){bubAcc=0;const cand=S.vill.filter(v=>!v.asleep&&v.x*T>cam.x&&v.x*T<cam.x+innerWidth/cam.z&&v.y*T>cam.y&&v.y*T<cam.y+innerHeight/cam.z&&!bubbles.some(b=>b.v===v));
     if(cand.length&&bubbles.length<3){const v=cand[Math.floor(Math.random()*cand.length)];v.th=thought(v);bubbles.push({v,t:v.th,a:0})}}
   for(const b of bubbles)b.a+=dt;bubbles=bubbles.filter(b=>b.a<3.5&&S.vill.includes(b.v));
+}
+let fw=null;
+const yearNo=()=>Math.floor(S.gt/(4*SEASON))+1;
+const FW_COL=['#ff4d4d','#ffd34d','#4dff88','#4dc3ff','#c44dff','#ff8a3d','#ffffff','#ff6bd6'];
+function startFireworks(demo){fw={t:0,dur:32,next:0,r:[],p:[]};if(!demo)toast(`🎆 Frohes neues Jahr! Jahr ${yearNo()} beginnt 🥂`)}
+function drawFireworks(dt){
+  if(!fw)return;fw.t+=dt;const Wd=innerWidth,Hd=innerHeight,end=fw.t>fw.dur;
+  const fade=Math.min(1,fw.t/1.5,Math.max(0,(fw.dur+4-fw.t)/2));
+  ctx.fillStyle=`rgba(5,8,30,${.42*fade})`;ctx.fillRect(0,0,Wd,Hd);
+  if(!end){fw.next-=dt;if(fw.next<=0){fw.next=.25+Math.random()*.45;const n=fw.t>fw.dur-5?3:1;for(let k=0;k<n;k++){const x=Wd*(.1+Math.random()*.8);fw.r.push({x,y:Hd+5,vx:(Math.random()-.5)*30,vy:-(Hd*.75+Math.random()*Hd*.35),ty:Hd*(.12+Math.random()*.35),c:pickA(FW_COL),c2:pickA(FW_COL),k:Math.floor(Math.random()*3)})}}}
+  ctx.globalCompositeOperation='lighter';
+  for(const r of fw.r){r.x+=r.vx*dt;r.y+=r.vy*dt;r.vy+=Hd*.35*dt;
+    ctx.fillStyle='rgba(255,220,150,.9)';ctx.beginPath();ctx.arc(r.x,r.y,1.8,0,7);ctx.fill();
+    for(let j=1;j<5;j++){ctx.fillStyle=`rgba(255,180,90,${.5-j*.1})`;ctx.beginPath();ctx.arc(r.x-r.vx*dt*j*2,r.y-r.vy*dt*j*2,1.4,0,7);ctx.fill()}
+    if(r.y<=r.ty||r.vy>=-20){r.dead=1;const m=r.k===2?70:50,sp=95+Math.random()*80;
+      for(let i=0;i<m;i++){const a=i/m*6.283+Math.random()*.1,v=sp*(r.k===1?(.4+Math.random()*.6):(.85+Math.random()*.3));fw.p.push({x:r.x,y:r.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:1.4+Math.random()*.8,m:1.8,c:r.k===2&&i%2?r.c2:r.c,tw:r.k===1})}
+      fw.p.push({flash:1,x:r.x,y:r.y,l:.25,m:.25})}}
+  fw.r=fw.r.filter(r=>!r.dead);
+  for(const q of fw.p){q.l-=dt;if(q.flash){ctx.fillStyle=`rgba(255,255,230,${Math.max(0,q.l/q.m)*.5})`;ctx.beginPath();ctx.arc(q.x,q.y,40*(1-q.l/q.m)+8,0,7);ctx.fill();continue}
+    q.vx*=1-1.6*dt;q.vy=q.vy*(1-1.6*dt)+40*dt;q.x+=q.vx*dt;q.y+=q.vy*dt;
+    const a=Math.max(0,q.l/q.m)*(q.tw?(.5+.5*Math.sin(fw.t*30+q.x)):1);ctx.globalAlpha=a;ctx.fillStyle=q.c;ctx.beginPath();ctx.arc(q.x,q.y,1.9,0,7);ctx.fill();
+    ctx.globalAlpha=a*.35;ctx.beginPath();ctx.arc(q.x-q.vx*.05,q.y-q.vy*.05,1.3,0,7);ctx.fill();ctx.globalAlpha=1}
+  fw.p=fw.p.filter(q=>q.l>0);ctx.globalCompositeOperation='source-over';
+  if(fw.t<6||(fw.t>fw.dur-6&&!end)){ctx.globalAlpha=Math.min(1,fw.t<6?Math.min(fw.t,6-fw.t):Math.min(fw.dur-fw.t,6-(fw.dur-fw.t)));ctx.font='bold 26px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=5;ctx.strokeStyle='rgba(0,0,0,.55)';const tx=`🎆 Frohes neues Jahr ${yearNo()}! 🎆`;ctx.strokeText(tx,Wd/2,Hd*.6);ctx.fillStyle='#ffe27a';ctx.fillText(tx,Wd/2,Hd*.6);ctx.globalAlpha=1}
+  if(end&&!fw.r.length&&!fw.p.length&&fw.t>fw.dur+4)fw=null;
 }
 function drawWx(dt){
   const si=seasonIdx(),dk=darkness();ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1299,6 +1325,7 @@ function render(dt){
     if(zoneAdj(zz)){ctx.font=`${T*.4}px sans-serif`;ctx.fillStyle='#ffd36b';ctx.fillText('Antippen zum Freischalten',zx,zy+T*1.3)}
   }
   drawWx(dt);
+  drawFireworks(dt);
 }
 
 // ======================= EINGABE =======================
@@ -1511,6 +1538,7 @@ function sheetMenu(){
   <p style="margin-top:12px"><b>Spielstand laden</b></p>
   <textarea id="imp" placeholder="Spielstand hier einfügen…"></textarea>
   <button class="big" data-act="import">📥 Laden</button>
+  <button class="big" data-act="fwshow">🎆 Neujahrs-Feuerwerk ansehen</button>
   <button class="danger" data-act="hchange">🔄 Hauptfigur wechseln</button>
   <button class="danger" data-act="newgame">${newConfirm?'⚠️ Wirklich neu starten? Nochmal tippen':'🆕 Neues Spiel'}</button>
   <p class="desc" style="margin-top:12px">🌐 Online-Funktionen (Dörfer besuchen, sich unterstützen) sind vorbereitet und folgen später.</p>`;
@@ -1699,6 +1727,7 @@ function act(a,p){
     case 'dres':{if(!S.rs)return;const c=dCost(S.rs.t/resSpeed());if(S.res.diamond<c){toast('Nicht genug Diamanten 💎');return}S.res.diamond-=c;S.rs.t=0.001;tick(0.01,true);toast(`💎 −${c} Diamanten: Forschung abgeschlossen!`);renderSheet();save();break}
     case 'bye':{const n=+p;const fr=freeV().sort((a,c)=>(a.partner?1:0)-(c.partner?1:0));if(fr.length<n){toast('Nicht genug freie Bewohner');return}
       for(const v of fr.slice(0,n))leaveV(v,false);toast(`👋 ${n} Bewohner ${n>1?'sind':'ist'} freundlich weitergezogen.`);renderSheet();save();break}
+    case 'fwshow':closeSheet();startFireworks(true);break;
     case 'itog':{const I=idleCfg();I[p]=!I[p];if(p==='trade'&&I.trade&&!has('stall'))toast('Baue zuerst einen 🏪 Händlerstand');renderSheet();save();break}
     case 'fest':{const fc=festCost();if(festOn()||(S.festCD||0)>S.gt||freeV().length<5||!canPay(fc)){toast('Fest gerade nicht möglich');return}pay(fc);S.fest=S.gt+FEST_T;S.festCD=S.gt+FEST_CD;for(const v of freeV())v.tx=null;gainXP(30);toast('🎉 Das Dorffest beginnt! Alle feiern am Lagerfeuer.');renderSheet();save();break}
     case 'explore':{const fr=freeV();if(!fr.length||S.res.food<15||S.vill.filter(v=>v.job&&v.job.t==='x').length>=EXP_MAX){toast('Gerade kein Erkunder verfügbar');return}const v=fr[Math.floor(Math.random()*fr.length)];S.res.food-=15;v.job={t:'x',until:S.gt+EXP_T};v.tx=null;v.role=null;toast(`🗺️ ${v.name} zieht los, um die Gegend zu erkunden!`);renderSheet();save();break}
