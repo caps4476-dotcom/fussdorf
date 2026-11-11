@@ -119,7 +119,9 @@ const B={
   woodcutter:{n:'Holzfäller',i:'🪓',roof:'#6b8e23',cost:{wood:10},slots:2,prod:{wood:0.15},near:TR,r:3,desc:'Fällt Bäume in der Nähe (Radius 3). Mehr Bäume = mehr Effizienz.'},
   quarry:{n:'Steinbruch',i:'⛰️',roof:'#8a8f96',cost:{wood:15},slots:2,prod:{stone:0.1},near:RK,r:3,desc:'Baut Felsen in der Nähe ab (Radius 3).'},
   scholar:{n:'Gelehrtenhaus',i:'📜',roof:'#5a6fd0',cost:{wood:20,stone:10},slots:2,prod:{research:0.08},desc:'Erzeugt Forschungspunkte für neue Gebäude.'},
-  storage:{n:'Lagerhaus',i:'📦',roof:'#8b5a2b',cost:{wood:30,stone:10},store:true,cap:150,req:'storage',desc:'+150 Lagerplatz pro Stufe. Abgabestelle für Sammler.'},
+  storage:{n:'Lagerhaus',i:'📦',roof:'#8b5a2b',cost:{wood:30,stone:10},store:true,cap:150,req:'storage',desc:'Klein (1 Feld): +150 Lagerplatz pro Stufe. Abgabestelle für Sammler.'},
+  storage2:{n:'Großes Lagerhaus',i:'📦📦',roof:'#7a4a24',fw:2,fh:2,cost:{wood:50,stone:40,planks:30},store:true,cap:550,req:'sawmill',desc:'Mittel (2×2 Felder): +550 Lagerplatz pro Stufe – fast 4× so viel wie das kleine. Abgabestelle für Sammler.'},
+  storage3:{n:'Lagerhalle',i:'🏭',roof:'#5a5f6a',fw:3,fh:2,cost:{stone:90,planks:70,iron:20,tools:5},store:true,cap:1100,req:'smelting',desc:'Groß (3×2 Felder): +1100 Lagerplatz pro Stufe. Die platzsparendste Lösung für große Dörfer. Abgabestelle für Sammler.'},
   sawmill:{n:'Sägewerk',i:'🪚',roof:'#b5651d',cost:{wood:30,stone:15},slots:2,conv:{in:{wood:0.15},out:{planks:0.1}},req:'sawmill',desc:'Verarbeitet Holz zu Brettern.'},
   farm:{n:'Bauernhof',i:'🌾',roof:'#d4b03a',cost:{wood:20,planks:10},slots:3,prod:{grain:0.2,food:0.08},season:1,req:'farm',desc:'Baut Getreide an (für die Mühle) und liefert etwas Nahrung.'},
   mine:{n:'Mine',i:'⛏️',roof:'#4a4a4a',cost:{planks:20,stone:20},slots:2,prod:{ore:0.06},near:OR,r:2,req:'mining',desc:'Fördert Erz. Braucht eine Erzader im Radius 2.'},
@@ -494,7 +496,7 @@ function countNear(x,y,t,r){let n=0;for(let yy=y-r;yy<=y+r;yy++)for(let xx=x-r;x
 function effAt(type,x,y){const d=B[type];if(d.near==null)return 1;const n=countNear(x,y,d.near,d.r);return n===0?0:Math.min(1,.4+n*.15)}
 const eff=b=>effAt(b.type,b.x,b.y);
 function mult(b,r){let m=1+.5*(b.level-1);if(S.tech.tools1&&(r==='wood'||r==='stone'))m*=1.2;if(S.tech.tools2)m*=1.3;if(S.tech.tools3)m*=1.25;if(S.tech.diamondtools)m*=1.2;if(S.tech.gemcraft2){if(r==='diamond')m*=1.5;if(r==='stone'||r==='ore')m*=1.15}if(hasRoad(b))m*=1.1;if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))m*=1+.25*PWR;if(S.story&&S.story.bless)m*=1.15;const hc=S.hero&&S.hero.c;if(hc==='thordis'&&r==='wood')m*=1.1;if(hc==='elmiran'&&r==='food')m*=1.15;if(hc==='zara'&&r==='research')m*=1.25;if(S.tech.agri2&&(r==='food'||r==='grain'))m*=1.25;if(S.tech.mining2&&(r==='stone'||r==='ore'))m*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))m*=1.15;m*=.8+.4*happy().total;if(B[b.type].season&&(r==='food'||r==='grain'))m*=SEAS[seasonIdx()].food;return m}
-const hasRoad=b=>[[1,0],[-1,0],[0,1],[0,-1]].some(([a,c])=>inMap(b.x+a,b.y+c)&&S.road[b.x+a+(b.y+c)*W]);
+const hasRoad=b=>{const w=fpW(b.type),h=fpH(b.type);for(let y=b.y-1;y<=b.y+h;y++)for(let x=b.x-1;x<=b.x+w;x++){const ins=x>=b.x&&x<b.x+w&&y>=b.y&&y<b.y+h,cor=(x<b.x||x>=b.x+w)&&(y<b.y||y>=b.y+h);if(ins||cor||!inMap(x,y))continue;if(S.road[x+y*W])return true}return false};
 function cap(r){if(r==='research'||r==='gold'||r==='diamond')return Infinity;if(r==='trash'){let c=50;for(const b of S.buildings)if(b.type==='dump'&&!isSite(b))c+=DUMP_CAP*b.level;return c}let c=100;for(const b of S.buildings)if(B[b.type].cap&&!isSite(b))c+=B[b.type].cap*b.level;return c}
 function popCap(){let c=0;for(const b of S.buildings)c+=beds(b);return c}
 function econ(dt,apply){
@@ -919,7 +921,7 @@ function selfBuildTick(dt,live){
 }
 
 // ======================= BEWOHNER =======================
-function nearestDrop(x,y){let best=null,bd=1e9;for(const b of S.buildings)if(B[b.type].store&&!isSite(b)){const d=Math.hypot(b.x+.5-x,b.y+.5-y);if(d<bd){bd=d;best=b}}return best}
+function nearestDrop(x,y){let best=null,bd=1e9;for(const b of S.buildings)if(B[b.type].store&&!isSite(b)){const d=Math.hypot(b.x+fpW(b.type)/2-x,b.y+fpH(b.type)/2-y);if(d<bd){bd=d;best=b}}return best}
 function tileCost(i){const t=S.tiles[i];if(t===WA)return Infinity;if(S.road[i])return .45;if(NODE[t])return S.amt[i]>0?2.2:1.2;return 1}
 function findPath(sx,sy,gx,gy){
   if(!inMap(sx,sy)||!inMap(gx,gy))return null;
@@ -1119,7 +1121,16 @@ function drawBig(b){
   const d=B[b.type],w=fpW(b.type)*T-4,h=fpH(b.type)*T-4,px=b.x*T+2,py=b.y*T+2,site=isSite(b),win=seasonIdx()===3;
   ctx.fillStyle='rgba(0,0,0,.25)';rr(ctx,px+2,py+3,w,h,7);ctx.fill();
   if(site)ctx.globalAlpha*=.45;
-  if(win&&!site)drawWinterFun(b,px,py,w,h);
+  if(!d.wjoy){
+    ctx.fillStyle=d.roof;rr(ctx,px,py,w,h,7);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.12)';for(let k=6;k<h-3;k+=7)ctx.fillRect(px+3,py+k,w-6,2);
+    ctx.fillStyle='rgba(0,0,0,.18)';for(let k=0;k<fpW(b.type);k++){const dx=px+k*T+T/2-6;rr(ctx,dx,py+h-14,12,12,2);ctx.fill()}
+    if(win){ctx.fillStyle='rgba(255,255,255,.8)';rr(ctx,px,py,w,6,4);ctx.fill()}
+    ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=1;rr(ctx,px,py,w,h,7);ctx.stroke();
+    ctx.fillStyle='rgba(255,250,235,.85)';ctx.beginPath();ctx.arc(px+w/2,py+h/2-2,T*.42,0,7);ctx.fill();
+    ctx.fillStyle='#000';ctx.font=`${[...d.i].length>2?T*.42:T*.66}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(d.i,px+w/2,py+h/2-1);
+  }
+  else if(win&&!site)drawWinterFun(b,px,py,w,h);
   else{
     if(b.type==='skate'){ctx.fillStyle='#9aa7ad';rr(ctx,px,py,w,h,7);ctx.fill();ctx.fillStyle='#b9c4c9';rr(ctx,px+4,py+4,w-8,h-8,6);ctx.fill();
       ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(px+w/2,py+h/2,w*.36,h*.3,0,0,7);ctx.stroke()}
