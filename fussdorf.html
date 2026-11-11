@@ -107,7 +107,7 @@ const RES={
   wood:{n:'Holz',i:'🪵'}, stone:{n:'Stein',i:'🪨'}, food:{n:'Nahrung',i:'🍎'},
   grain:{n:'Getreide',i:'🌾'}, flour:{n:'Mehl',i:'🥣'},
   planks:{n:'Bretter',i:'🪚'}, ore:{n:'Erz',i:'⛏️'}, iron:{n:'Eisen',i:'⚙️'}, tools:{n:'Werkzeuge',i:'🔧'},
-  research:{n:'Forschung',i:'🔬'}, gold:{n:'Gold',i:'💰'}, diamond:{n:'Diamanten',i:'💎'}, trash:{n:'Müll',i:'🗑️'}
+  research:{n:'Forschung',i:'🔬'}, gold:{n:'Gold',i:'💰'}, diamond:{n:'Diamanten',i:'💎'}, trash:{n:'Müll',i:'🗑️'}, meat:{n:'Fleisch',i:'🥩'}, cattle:{n:'Vieh',i:'🐄'}
 };
 const THEMES=['berg','wald','berg','see','start','wald','berg','wiese','see'];
 const THEME_N={start:'Lichtung',wald:'Dichter Wald',berg:'Erzberge',see:'Seenland',wiese:'Blumenwiese'};
@@ -141,6 +141,9 @@ const B={
   stall:{n:'Händlerstand',i:'🏪',roof:'#d08a3a',cost:{wood:20,stone:10},desc:'Hier verkaufst du Waren für Gold und kaufst ein. Jede Stufe: +8 % bessere Preise. Lockt den fahrenden Händler an.'},
   tavern:{n:'Taverne',i:'🍺',roof:'#8a4a2a',cost:{wood:30,stone:15},joy:4,req:'s_tavern',lockT:'🔒 Geschichte: Kapitel 1',desc:'Hildegards Taverne: +4 Freude pro Stufe. Hier werden Geschichten erzählt.'},
   diamondmine:{n:'Diamantmine',i:'💎',roof:'#3a6a8a',cost:{planks:30,stone:40,iron:15,tools:8,gold:80},slots:2,prod:{diamond:.0011},rare:1,near:OR,r:2,req:'gemcraft',desc:'Gräbt tief nach Diamanten – Funde sind selten! Braucht eine Erzader im Radius 2 (Erzberge). Diamanten 💎 beschleunigen Bauten und Forschung, kaufen Elite-Technik und bringen auf dem Markt viel Gold.'},
+  hunter:{n:'Jägerhütte',i:'🏹',roof:'#5a4a2a',cost:{wood:25,stone:5},slots:2,prod:{meat:.05},near:TR,r:2,wild:1,req:'hunting',desc:'Jäger erlegen Wild im Wald (Bäume im Radius 2) und liefern 🥩 Fleisch. Achtung: Zu viel Jagd dezimiert den Wildbestand – dann sinkt die Beute.'},
+  ranch:{n:'Tierfarm',i:'🐄',roof:'#8a6a3a',fw:2,fh:2,cost:{wood:50,planks:30,stone:20},slots:3,conv:{in:{grain:.15},out:{cattle:.05}},req:'husbandry',desc:'Große Weide (2×2): Bauern ziehen mit Getreide als Futter 🐄 Vieh groß.'},
+  butcher:{n:'Metzgerei',i:'🔪',roof:'#a33a3a',cost:{stone:30,planks:20},slots:2,conv:{in:{cattle:.04},out:{meat:.3}},req:'husbandry',desc:'Der Metzger verarbeitet 🐄 Vieh zu 🥩 Fleisch.'},
   dump:{n:'Müllplatz',i:'🚛',roof:'#5a6a3a',cost:{wood:40,stone:30,planks:15},slots:2,desc:'Müllmänner sammeln den Müll im Dorf ein und lagern ihn auf der Halde (400 pro Stufe, eigenes Lager). Auf der Halde verrotten 25 Müll pro Min. und Stufe. Ab ca. 15 Einwohnern entsteht Müll – liegt er herum, sinkt die Zufriedenheit. Mit „Müllverbrennung“ heizt der Müll dein Kraftwerk.'},
   rodel:{n:'Rodelbahn',i:'🛷',roof:'#8fb0c4',fw:2,fh:3,cost:{wood:40,planks:15},joy:1,wjoy:10,desc:'Im Winter das Highlight: +10 Freude pro Stufe (sonst +1). Großer Hang (2×3 Felder) – bei Schnee sausen viele Bewohner auf Schlitten hinunter.'},
   skate:{n:'Eisbahn',i:'⛸️',roof:'#6f9fc0',fw:3,fh:2,cost:{stone:30,planks:20,gold:20},joy:1,wjoy:12,desc:'Im Winter friert die Bahn zu: +12 Freude pro Stufe (sonst +1). Große Fläche (3×2 Felder) – viele Bewohner drehen ihre Runden auf Schlittschuhen.'},
@@ -170,6 +173,8 @@ Object.assign(R,{
   agri2:{n:'Fruchtfolge',i:'🌱',cost:{research:120,gold:120},need:['milling'],desc:'+25 % Nahrung und Getreide.'},
   mining2:{n:'Tiefbau',i:'🪨',cost:{research:150,gold:150,tools:10},need:['mining','tools2'],desc:'+25 % Stein und Erz.'},
   arch1:{n:'Baukunst',i:'🏛️',cost:{research:180,gold:250,planks:100},need:['tools2'],desc:'Gebäude bis Stufe 7 (wenn genug Zonen frei sind).'},
+  hunting:{n:'Jagd',i:'🏹',cost:{research:25,gold:10},desc:'Schaltet die Jägerhütte frei.'},
+  husbandry:{n:'Viehzucht',i:'🐄',cost:{research:80,gold:60},need:['farm'],desc:'Schaltet Tierfarm und Metzgerei frei.'},
   incinerate:{n:'Müllverbrennung',i:'🔥',cost:{research:150,gold:150,iron:10},need:['electricity'],desc:'Das Kraftwerk verbrennt gesammelten Müll statt Holz. Aus einem Problem wird Energie!'},
   gemcraft:{n:'Edelsteinkunde',i:'💎',cost:{research:100,gold:120,tools:10},need:['smithing'],desc:'Schaltet die Diamantmine frei.'},
   gemcraft2:{n:'Diamantbohrer',i:'🔩',cost:{research:180,gold:200},need:['gemcraft','tools2'],desc:'Elite-Technik: +50 % Diamanten, +15 % Stein und Erz. Kostet Diamanten.'},
@@ -332,7 +337,7 @@ function happy(){
   if(seasonIdx()===3)jp+=5;
   if(adults()>=6)jp+=5*(S.sec==null?1:S.sec);
   const joy=Math.min(1,jp*2/pop*(S.hero&&S.hero.c==='lyonessa'?1.5:1)+(festOn()?.4:0));
-  return {food,home,joy,total:Math.max(0,Math.min(1,.4*food+.3*home+.3*joy-taxPen()-.25*dirtLvl()))};
+  return {food,home,joy,total:Math.max(0,Math.min(1,.4*food+.3*home+.3*joy-taxPen()-.25*dirtLvl()+(S.res.meat>1?.06:0)))};
 }
 const needXP=L=>Math.round(30*Math.pow(L,1.5));
 function lvInfo(){let L=1,x=S.xp;while(x>=needXP(L)){x-=needXP(L);L++}return{L,x,n:needXP(L)}}
@@ -386,7 +391,7 @@ function genMap(seed){
 let S;
 function newGame(){
   const seed=(Math.random()*1e9)|0;
-  S={v:1,seed,time:Date.now(),res:{wood:15,stone:5,food:15,grain:0,flour:0,planks:0,ore:0,iron:0,tools:0,research:0,gold:0,diamond:0,trash:0},
+  S={v:1,seed,time:Date.now(),res:{wood:15,stone:5,food:15,grain:0,flour:0,planks:0,ore:0,iron:0,tools:0,research:0,gold:0,diamond:0,trash:0,meat:0,cattle:0},
      buildings:[],vill:[],zones:[0,0,0,0,1,0,0,0,0],tech:{},nid:1,spawnT:0,flags:{},made:{},goal:0,gt:90,tv:2,xp:0,story:{ch:0,on:0,st:0,pages:[],mk:{},nt:-1}};
   S.tiles=genMap(seed);
   S.amt=S.tiles.map(t=>NODE[t]?NODE[t].max:0);
@@ -466,6 +471,24 @@ function exploreLoot(v,live){
   if(live)toast(`🗺️ ${v.name} ist von der Erkundung zurück: ${txt}${got.diamond?' – ein Diamant! 💎':''}`);
 }
 
+// ======================= WILD =======================
+let WMAX=0,WMAX_T=-1,WSPOTS=[],WSP_T=-99;
+function wildMax(){if(WMAX_T<0||performance.now()-WMAX_T>20000){let n=0;for(let i=0;i<S.tiles.length;i++)if(S.tiles[i]===TR)n++;WMAX=40+n*.5;WMAX_T=performance.now()}return WMAX}
+function wildF(){const m=wildMax();if(S.wild==null)S.wild=m;return Math.max(0,Math.min(1,S.wild/m))}
+function wildTick(dt){const m=wildMax();if(S.wild==null)S.wild=m;const w=Math.max(S.wild,m*.03);S.wild=Math.min(m,S.wild+.006*w*(1-S.wild/m)*dt*(seasonIdx()===3?.4:1))}
+function drawWild(){
+  const now=performance.now()/1000;
+  if(now-WSP_T>25){WSP_T=now;const n=Math.round(7*wildF());WSPOTS=[];let tries=0;
+    while(WSPOTS.length<n&&tries++<400){const x=1+Math.floor(Math.random()*(W-2)),y=1+Math.floor(Math.random()*(H-2));
+      if(S.tiles[x+y*W]!==GR||buildingAt(x,y)||S.road[x+y*W])continue;
+      if(![[1,0],[-1,0],[0,1],[0,-1]].some(([a,c])=>S.tiles[x+a+(y+c)*W]===TR))continue;
+      WSPOTS.push({x,y,k:Math.random()<.6?'🦌':'🐇',ph:Math.random()*6})}}
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  for(const a of WSPOTS){const t=now+a.ph,ox=Math.sin(t*.4)*T*.25,oy=Math.cos(t*.3)*T*.15,hop=a.k==='🐇'?Math.abs(Math.sin(t*3))*2:0;
+    ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.ellipse((a.x+.5)*T+ox,(a.y+.75)*T+oy,T*.17,T*.06,0,0,7);ctx.fill();
+    ctx.fillStyle='#000';ctx.font=`${a.k==='🦌'?T*.5:T*.36}px sans-serif`;ctx.save();ctx.translate((a.x+.5)*T+ox,(a.y+.5)*T+oy-hop);if(Math.sin(t*.4+1.57)<0)ctx.scale(-1,1);ctx.fillText(a.k,0,0);ctx.restore()}
+}
+
 // ======================= MÜLL =======================
 const TRASH_P=.012,DUMP_C=.5,SWEEP_C=.1,DUMP_CAP=400,DUMP_ROT=25/60;
 const trashGen=()=>Math.max(0,S.vill.length-15)*TRASH_P;
@@ -509,9 +532,9 @@ function econ(dt,apply){
   for(const b of S.buildings){
     const def=B[b.type],w=cnt[b.id]||0;if(!w||isSite(b))continue;
     const e=eff(b);if(!e)continue;
-    const f=(pw[b.id]||w)*e*hf;
+    const f=(pw[b.id]||w)*e*hf*(def.wild?wildF():1);
     if(def.rare){for(const r in def.prod){const ev=def.prod[r]*mult(b,r)*f*dt;if(!apply){add(r,ev);continue}let n=Math.floor(ev);if(Math.random()<ev-n)n++;if(n){add(r,n);if(liveTick)DFOUND+=n}}}
-    else if(def.prod)for(const r in def.prod)add(r,def.prod[r]*mult(b,r)*f*dt);
+    else if(def.prod)for(const r in def.prod){const a=def.prod[r]*mult(b,r)*f*dt;add(r,a);if(def.wild&&apply)S.wild=Math.max(0,S.wild-a*1.2)}
     if(def.conv){
       const m=mult(b,null);let ratio=1;const cin=b.type==='power'&&S.tech.incinerate&&S.res.trash+(d.trash||0)>1?{trash:.4}:def.conv.in;
       for(const r in cin){const need=cin[r]*m*f*dt,have=Math.max(0,S.res[r]+(d[r]||0));ratio=Math.min(ratio,need>0?have/need:1)}
@@ -520,7 +543,7 @@ function econ(dt,apply){
       if(apply&&def.track)S.made[def.track]=(S.made[def.track]||0)+ratio*f*dt;
     }
   }
-  add('food',-S.vill.length*FOOD_PER*dt);
+  {const need=S.vill.length*FOOD_PER*dt,mUse=Math.min(need*.25/2,Math.max(0,S.res.meat+(d.meat||0)));add('meat',-mUse);add('food',-(need-mUse*2))}
   if(!apply){const room=Math.max(0,cap('trash')-S.res.trash),c=(S.dirt>1?Math.min(TR_COL+TR_SW,trashGen()+S.dirt/dt,room/dt+TR_ROT):Math.min(TR_COL+TR_SW,trashGen())),r=Math.min(TR_ROT,c+S.res.trash/dt);add('trash',(c-r)*dt)}
   {const tg=taxPerDay();if(tg){add('gold',tg/DAY*dt);if(apply)gLog('🏛️ Steuern',tg/DAY*dt)}}
   if(apply)for(const r in d){if(d[r]>0){S.made[r]=(S.made[r]||0)+d[r];if(r!=='research')S.xp+=d[r]*.1}S.res[r]=Math.max(0,Math.min(cap(r),S.res[r]+d[r]))}
@@ -558,6 +581,7 @@ function tick(dt,live){
   idleTick(dt,live);
   gDecay(dt);
   trashTick(dt,live);
+  wildTick(dt);
   moodTick(dt,live);
   bankTick(dt,live);
   heroTick(dt,live);
@@ -592,7 +616,7 @@ function catchUp(show){
 }
 
 // ======================= MARKT =======================
-const PRICE={wood:.5,stone:.6,food:.4,grain:.8,flour:1.5,planks:1.6,ore:2,iron:5,tools:12,diamond:90};
+const PRICE={wood:.5,stone:.6,food:.4,grain:.8,flour:1.5,planks:1.6,ore:2,iron:5,tools:12,diamond:90,meat:2.5,cattle:6};
 const pDrop=(r,n)=>r==='diamond'?n*.04:n*PRICE[r]/400;
 function tradeBonus(){const st=S.buildings.filter(b=>b.type==='stall'&&!isSite(b));if(!st.length)return 0;let m=1+.08*(Math.max(...st.map(b=>b.level))-1);if(S.tech.market)m*=1.1;if(S.hero&&S.hero.c==='zara')m*=1.15;return m}
 const sellP=r=>PRICE[r]*S.mkt[r].f*tradeBonus();
@@ -1121,7 +1145,8 @@ function drawBig(b){
   const d=B[b.type],w=fpW(b.type)*T-4,h=fpH(b.type)*T-4,px=b.x*T+2,py=b.y*T+2,site=isSite(b),win=seasonIdx()===3;
   ctx.fillStyle='rgba(0,0,0,.25)';rr(ctx,px+2,py+3,w,h,7);ctx.fill();
   if(site)ctx.globalAlpha*=.45;
-  if(!d.wjoy){
+  if(b.type==='ranch'&&!site){drawRanch(b,px,py,w,h)}
+  else if(!d.wjoy){
     ctx.fillStyle=d.roof;rr(ctx,px,py,w,h,7);ctx.fill();
     ctx.fillStyle='rgba(255,255,255,.12)';for(let k=6;k<h-3;k+=7)ctx.fillRect(px+3,py+k,w-6,2);
     ctx.fillStyle='rgba(0,0,0,.18)';for(let k=0;k<fpW(b.type);k++){const dx=px+k*T+T/2-6;rr(ctx,dx,py+h-14,12,12,2);ctx.fill()}
@@ -1149,6 +1174,20 @@ function drawBig(b){
     ctx.font='bold 7px sans-serif';ctx.textAlign='center';ctx.lineWidth=2.5;ctx.strokeStyle='rgba(0,0,0,.7)';const tx_=Math.ceil(b.cs/bSpeed())+'s';ctx.strokeText(tx_,cx,py-12);ctx.fillStyle='#fff';ctx.fillText(tx_,cx,py-12);
     return}
   if(b.level>1){ctx.fillStyle='#ffd36b';ctx.beginPath();ctx.arc(px+w-4,py+4,6,0,7);ctx.fill();ctx.fillStyle='#3a2c1a';ctx.font='bold 8px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(b.level,px+w-4,py+4.5)}
+}
+function drawRanch(b,px,py,w,h){
+  const win=seasonIdx()===3,t=performance.now()/1000;
+  ctx.fillStyle=win?'#e8eef2':'#7fb552';rr(ctx,px,py,w,h,6);ctx.fill();
+  ctx.fillStyle=win?'rgba(200,215,225,.6)':'rgba(255,255,255,.08)';for(let k=0;k<5;k++){ctx.beginPath();ctx.ellipse(px+w*((k*37)%100)/100,py+h*((k*53)%100)/100,7,3,0,0,7);ctx.fill()}
+  ctx.fillStyle='#8b5a2b';ctx.fillRect(px+3,py+3,T*.55,T*.45);ctx.fillStyle='#a33a2a';ctx.beginPath();ctx.moveTo(px+1,py+5);ctx.lineTo(px+3+T*.275,py-3);ctx.lineTo(px+5+T*.55,py+5);ctx.fill();
+  ctx.fillStyle='#6b8fb0';ctx.fillRect(px+w-18,py+h-9,14,5);
+  ctx.strokeStyle='#7a5230';ctx.lineWidth=1.6;rr(ctx,px+1,py+1,w-2,h-2,6);ctx.stroke();
+  ctx.lineWidth=1;for(let k=4;k<w;k+=6){ctx.beginPath();ctx.moveTo(px+k,py+1);ctx.lineTo(px+k,py+4);ctx.moveTo(px+k,py+h-4);ctx.lineTo(px+k,py+h-1);ctx.stroke()}
+  const an=['🐄','🐖','🐑','🐄','🐓','🐑','🐄','🐖'],n=Math.min(8,2+b.level+Math.floor((S.res.cattle||0)/40));
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#000';
+  for(let i=0;i<n;i++){const k=an[(b.id+i)%an.length],bx=px+w*(.22+.28*(i%3)+(Math.floor(i/3)%2)*.12),by=py+h*(.4+.22*(Math.floor(i/3)%3)),x=bx+Math.sin(t*.3+i*2)*T*.18,y=by+Math.cos(t*.25+i)*T*.1;
+    ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.ellipse(x,y+5,6,2,0,0,7);ctx.fill();ctx.fillStyle='#000';
+    ctx.font=`${k==='🐓'?T*.3:T*.42}px sans-serif`;ctx.save();ctx.translate(x,y);if(Math.cos(t*.3+i*2)<0)ctx.scale(-1,1);ctx.fillText(k,0,0);ctx.restore()}
 }
 function drawPerson(x,y,c){ctx.fillStyle=c;ctx.beginPath();ctx.arc(x,y,2.8,0,7);ctx.fill();ctx.fillStyle='#f5d0a9';ctx.beginPath();ctx.arc(x,y-2.9,1.8,0,7);ctx.fill()}
 function drawWinterFun(b,px,py,w,h){
@@ -1255,6 +1294,7 @@ function thought(v){
   if(v.job&&v.job.t==='h')o.push('Mit anpacken! 🔨','Gemeinsam geht’s schneller!');
   if(!v.job&&v.role==='w')o.push('Alles ruhig im Dorf 🛡️','Ich halte die Augen offen 👀');
   if(!v.job&&v.role==='s')o.push('Hier fegen, da fegen 🧹','Ordnung muss sein!');
+  if(S.res.meat>1)o.push('Heute gibt’s Braten! 🍖','Mmh, frische Wurst vom Metzger 🥩');
   if(dirtLvl()>.4)o.push('Überall liegt Müll! 🤢','Wer räumt hier mal auf? 🗑️','Das stinkt zum Himmel …');
   if(!v.job&&v.role==='t')o.push('Frische Ware! Kauft ein! 🛒','Ein gutes Geschäft!');
   if(seasonIdx()===3&&S.buildings.some(b=>b.type==='rodel'&&!isSite(b)))o.push('Ab auf die Rodelbahn! 🛷','Wer ist schneller unten? 🛷');
@@ -1340,6 +1380,7 @@ function render(dt){
   const cnt=workerCounts();
   drawXmas();
   DLV=dirtLvl();
+  drawWild();
   for(const b of S.buildings)if(vis(b.x,b.y)||(B[b.type].fw&&vis(b.x+fpW(b.type)-1,b.y+fpH(b.type)-1))){if(placing&&placing.move===b.id)ctx.globalAlpha=.35;drawBuilding(b,cnt);if(b.type==='house'&&DLV>.12&&!isSite(b))drawBags(b);ctx.globalAlpha=1;if(demoMode&&demoTarget&&demoTarget.k==='b'&&demoTarget.id===b.id){ctx.fillStyle='rgba(255,60,40,.45)';ctx.fillRect(b.x*T,b.y*T,T*fpW(b.type),T*fpH(b.type));ctx.font=`${T*.5}px sans-serif`;ctx.fillText('❌',(b.x+fpW(b.type)/2)*T,(b.y+fpH(b.type)/2)*T)}}
   const vs=S.vill.filter(v=>vis(v.x,v.y)).sort((a,b)=>a.y-b.y);
   for(const v of vs)if(!v.asleep&&!(v.job&&v.job.t==='x'))drawV(v);
@@ -1633,6 +1674,7 @@ function sheetBuilding(b){
   if(d.house)h+=`<p>🛏️ Wohnplätze: <b>${beds(b)}</b></p>`;
   if(d.joy)h+=`<p>🎉 Freude: <b>+${joyOf(d)*b.level}</b>${d.wjoy?(seasonIdx()===3?' ❄️ Winterbetrieb!':` <small>(im Winter +${d.wjoy*b.level})</small>`):''}</p>`;
   if(d.store)h+=`<p>📥 Abgabestelle für Sammler</p>`;
+  if(d.wild){const wf=wildF();h+=bar('🦌 Wildbestand',wf)+`<p class="desc">${wf<.3?'⚠️ Das Wild wird knapp – weniger jagen, damit es sich erholt!':wf<.6?'Der Bestand sinkt. Achte auf nachhaltige Jagd.':'Der Wald ist voller Wild.'} Im Winter vermehrt es sich langsamer. Mehr Wald = mehr Wild.</p>`}
   if(!d.fixed&&!d.joy)h+=hasRoad(b)?'<p>🛣️ Weganschluss: <b>+10 %</b></p>':'<p class="desc">🛣️ Kein Weganschluss – ein Weg daneben bringt +10 %.</p>';
   if(d.cap)h+=`<p>📦 Lagerplatz: +${d.cap*b.level} (gesamt ${cap('wood')})</p>`;
   if(d.near!=null){const n=countNear(b.x,b.y,d.near,d.r),e=eff(b);h+=`<p>Effizienz: <b class="${e<.6?'miss':''}">${Math.round(e*100)} %</b> (${n}× ${NEAR_N[d.near]} in Reichweite)</p>`}
@@ -1679,7 +1721,7 @@ function renderGoal(){
 }
 function updateUI(){
   const rt=econ(60,false),ore=S.tech.mining||S.res.ore>0||zonesCount()>1;
-  const show={gold:has('stall')||S.res.gold>0,wood:1,stone:1,food:1,grain:S.tech.farm||S.res.grain>0,flour:S.tech.milling||S.res.flour>0,planks:S.tech.sawmill||S.res.planks>0,ore,iron:S.tech.smelting||S.res.iron>0,tools:S.tech.smithing||S.res.tools>0,research:1,diamond:S.tech.gemcraft||S.res.diamond>0,trash:has('dump')||S.res.trash>0};
+  const show={gold:has('stall')||S.res.gold>0,wood:1,stone:1,food:1,grain:S.tech.farm||S.res.grain>0,flour:S.tech.milling||S.res.flour>0,planks:S.tech.sawmill||S.res.planks>0,ore,iron:S.tech.smelting||S.res.iron>0,tools:S.tech.smithing||S.res.tools>0,research:1,diamond:S.tech.gemcraft||S.res.diamond>0,trash:has('dump')||S.res.trash>0,meat:S.tech.hunting||S.tech.husbandry||S.res.meat>0,cattle:S.tech.husbandry||S.res.cattle>0};
   let h='';
   for(const r in RES){if(!show[r])continue;const v=S.res[r],d=rt[r]||0,full=v>=cap(r)-.01;
     h+=`<div class="chip ${full?'full':''} ${r==='food'&&v<=0.001?'warn':''} ${r==='gold'&&has('stall')?'click':''}" ${r==='gold'&&has('stall')?'data-act="trade"':''}><span>${RES[r].i}</span><b>${fmt(v)}</b>${Math.abs(d)>=.05?`<small class="${d<0?'neg':''}">${d>0?'+':'−'}${f1(d)}/m</small>`:''}</div>`}
