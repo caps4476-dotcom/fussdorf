@@ -610,6 +610,7 @@ function tick(dt,live){
   trashTick(dt,live);
   wildTick(dt);
   healthTick(dt,live);
+  if(live)advisorTick(dt);
   moodTick(dt,live);
   bankTick(dt,live);
   heroTick(dt,live);
@@ -1545,6 +1546,7 @@ function renderSheet(){
     case 'build':h=sheetBuild();break;
     case 'research':h=sheetResearch();break;
     case 'village':h=sheetVillage();break;
+    case 'advisor':h=sheetAdvisor();break;
     case 'menu':h=sheetMenu();break;
     case 'b':{const b=byId(sheetArg);if(!b){closeSheet();return}h=sheetBuilding(b);break}
     case 'node':h=sheetNode(sheetArg.x,sheetArg.y);break;
@@ -1668,6 +1670,59 @@ function sheetPop(){
   for(const n of [1,5,10,25])h+=`<button class="sm" style="flex:1" data-act="bye:${n}" ${fr>=n?'':'disabled'}>${n}</button>`;
   h+=`</div><p class="desc">Sie ziehen freundlich weiter – ohne Unmut im Dorf. Wer arbeitet, bleibt.</p></div>`;
   return h}
+// ======================= DORFBERATER =======================
+function advice(){
+  const A=[],rt=econ(60,false),ad=adults(),pop=S.vill.length,fr=freeV().length,bl=t=>S.buildings.filter(b=>b.type===t&&!isSite(b));
+  const freeSlots=t=>bl(t).reduce((a,b)=>a+Math.max(0,slots(b)-wcount(b)),0),first=t=>bl(t).find(b=>slots(b)>wcount(b))||bl(t)[0];
+  const add=(lv,i,t,tip,act,lbl,key)=>A.push({lv,i,t,tip,act,lbl,key:key||t});
+  // Nahrung
+  const fr_=rt.food||0,fd=S.res.food;
+  if(fd<=.001||(fr_<0&&fd/(-fr_)<4)){
+    const lv=fd<=.001?3:2,head=fd<=.001?'Nahrung ist leer – die Bewohner hungern!':`Nahrung reicht nur noch ca. ${Math.max(1,Math.floor(fd/(-fr_)))} Min.`;
+    if(S.res.flour>10&&bl('bakery').length&&freeSlots('bakery')&&fr)add(lv,'🍎',head,`Im Lager liegen ${fmt(S.res.flour)} Mehl. Stelle mehr Bäcker ein – in deinen Bäckereien sind noch ${freeSlots('bakery')} Plätze frei.`,'ob:'+first('bakery').id,'🥖 Zur Bäckerei','food');
+    else if(S.res.flour>10&&S.tech.milling)add(lv,'🍎',head,`Im Lager liegen ${fmt(S.res.flour)} Mehl. Baue eine weitere 🥖 Bäckerei – sie macht aus Mehl sehr viel Nahrung.`,'nav:build','🔨 Bauen','food');
+    else if(S.res.grain>30&&bl('mill').length&&freeSlots('mill')&&fr)add(lv,'🍎',head,`Du hast ${fmt(S.res.grain)} Getreide. Stelle Müller ein (${freeSlots('mill')} Plätze frei), damit daraus Mehl und dann Brot wird.`,'ob:'+first('mill').id,'🌬️ Zur Mühle','food');
+    else if(S.res.grain>30&&S.tech.milling&&!bl('mill').length)add(lv,'🍎',head,`Du hast ${fmt(S.res.grain)} Getreide. Baue eine 🌬️ Mühle und eine 🥖 Bäckerei.`,'nav:build','🔨 Bauen','food');
+    else if(S.res.meat>5)add(lv,'🍎',head,'Fleisch hilft schon, reicht aber nicht. Baue mehr Fischerhütten, Höfe oder Bäckereien.','nav:build','🔨 Bauen','food');
+    else add(lv,'🍎',head,`Baue mehr Nahrungsbetriebe (Sammler 🫐, Fischer 🎣, Bauernhof 🌾${S.tech.milling?', Bäckerei 🥖':''}) und besetze sie mit freien Bewohnern.`,'nav:build','🔨 Bauen','food');
+  }
+  if(seasonIdx()===2&&fd<pop*FOOD_PER*60*6&&fd>.001)add(1,'❄️','Der Winter kommt!','Im Winter wachsen keine Felder. Lege jetzt einen Nahrungsvorrat an.','nav:build','🔨 Bauen','winter');
+  // Wohnen
+  if(homeless()>0)add(2,'🏠',`${homeless()} Bewohner haben kein Dach über dem Kopf`,'Baue neue Häuser oder baue bestehende aus.','nav:build','🔨 Bauen','home');
+  // Lager voll
+  {const full=Object.keys(RES).filter(r=>!['research','gold','diamond','trash'].includes(r)&&isFinite(cap(r))&&S.res[r]>=cap(r)-.5&&(rt[r]||0)>0);
+   if(full.length)add(1,'📦',`Lager voll: ${full.map(r=>RES[r].i).join(' ')}`,`Was produziert wird, geht verloren. Baue ein größeres Lager${S.tech.smelting?' (🏭 Lagerhalle)':S.tech.sawmill?' (📦📦 Großes Lagerhaus)':''} oder verkaufe Überschuss auf dem Markt.`,'nav:build','🔨 Bauen','full')}
+  // Müll
+  {const dl=dirtLvl();if(dl>.35)add(dl>.7?2:1,'🗑️',`Verschmutzung ${Math.round(dl*100)} %`,!bl('dump').length?'Baue einen 🚛 Müllplatz und stelle Müllmänner ein.':freeSlots('dump')&&fr?`Stelle mehr Müllmänner ein (${freeSlots('dump')} Plätze frei).`:S.res.trash>=cap('trash')-1?'Die Müllhalde ist voll – baue den Müllplatz aus.':'Baue einen weiteren Müllplatz oder baue ihn aus.',bl('dump').length?'ob:'+(first('dump').id):'nav:build',bl('dump').length?'🚛 Zum Müllplatz':'🔨 Bauen','dirt')}
+  // Krankheit
+  {const n=sickN();if(n>=3&&n>ad*.06){const hos=bl('hospital');let tip=fd<=.001?'Hunger macht krank – zuerst die Nahrung sichern! ':'';
+    tip+=hos.length?(hos.some(b=>!wcount(b))?'Stelle Ärzte im Krankenhaus ein.':'Baue das Krankenhaus aus (mehr Betten).'):S.tech.medicine?'Baue ein 🏥 Krankenhaus.':S.tech.herbs?(bl('herbs').length?'Erforsche 💊 Medizin für ein Krankenhaus.':'Baue eine 🌿 Kräuterhütte.'):'Erforsche 🌿 Kräuterkunde.';
+    add(n>ad*.15?2:1,'🤒',`${n} Bewohner sind krank`,tip,hos.length?'ob:'+hos[0].id:S.tech.herbs?'nav:build':'nav:research',hos.length?'🏥 Zum Krankenhaus':S.tech.herbs?'🔨 Bauen':'🔬 Forschung','sick')}}
+  // Zufriedenheit
+  {const H=happy();if(H.total<LEAVE_AT+.1){const why=[];if(taxPen()>.1)why.push('Steuern senken');if(H.food<.7)why.push('Nahrung sichern');if(H.home<.6)why.push('mehr Wohnraum');if(dirtLvl()>.3)why.push('Müll beseitigen');if(sickN()>ad*.06)why.push('Kranke heilen');if(H.joy<.4)why.push('Freude-Gebäude bauen (Taverne, Brunnen, Bahnen …)');
+    add(H.total<LEAVE_AT?3:2,'😟',`Zufriedenheit nur ${Math.round(H.total*100)} %${H.total<LEAVE_AT?' – Bewohner ziehen weg!':''}`,why.length?'Am meisten hilft: '+why.join(', ')+'.':'Baue mehr Freude-Gebäude.','nav:village','👥 Zum Dorf','happy')}}
+  // Unbesetzte Betriebe
+  {const empty=S.buildings.filter(b=>!isSite(b)&&B[b.type].slots&&!wcount(b)&&!['uni','garage','school'].includes(b.type));
+   if(empty.length&&fr)add(1,'👷',`${empty.length} Betrieb${empty.length>1?'e':''} ohne Arbeiter`,`z. B. ${B[empty[0].type].i} ${B[empty[0].type].n}. Du hast ${fr} freie Bewohner – tippe das Gebäude an und füge Arbeiter hinzu.`,'ob:'+empty[0].id,'👷 Hinschauen','empty')}
+  // Forschung
+  if(!S.rs){const can=Object.keys(R).filter(k=>!S.tech[k]&&gateOk(k)&&!(R[k].need||[]).some(n=>!S.tech[n])&&canPay(R[k].cost)&&(!R[k].edu||eduCount()>=R[k].edu));if(can.length)add(0,'🔬','Keine Forschung aktiv',`Du kannst gerade ${can.length} Forschung${can.length>1?'en':''} starten, z. B. ${R[can[0]].i} ${R[can[0]].n}.`,'nav:research','🔬 Forschung','res')}
+  // Wild, Strom, Ruhe
+  if(bl('hunter').length&&wildF()<.3)add(1,'🦌','Das Wild wird knapp','Deine Jäger jagen zu viel. Nimm Jäger heraus, damit sich der Bestand erholt.','ob:'+bl('hunter')[0].id,'🏹 Zur Jägerhütte','wild');
+  if(bl('power').length&&PWR_D>PWR_S)add(0,'⚡','Zu wenig Strom',`Strom für ${Math.round(PWR_S)} von ${PWR_D} Betrieben. Baue das Kraftwerk aus${S.res.wood<5&&!(S.tech.incinerate&&S.res.trash>1)?' – und es fehlt Brennstoff (Holz)!':''}.`,'ob:'+bl('power')[0].id,'⚡ Zum Kraftwerk','power');
+  return A.sort((a,b)=>b.lv-a.lv);
+}
+const LVC=['#4f8a2b','#c9a227','#d07a1a','#c0392b'],LVN=['Tipp','Hinweis','Wichtig','Dringend'];
+function sheetAdvisor(){
+  const A=advice();let h=`<h3>📋 Dorfberater</h3><p class="desc">Ich behalte dein Dorf im Auge und sage dir, wo es hakt – das Dringendste steht oben.</p>`;
+  if(!A.length)return h+`<div class="item" style="display:block"><b>😊 Alles im grünen Bereich!</b><small>Gerade gibt es keine Probleme. Weiter so!</small></div>`;
+  for(const a of A)h+=`<div class="item" style="display:block;border-left:5px solid ${LVC[a.lv]}"><div style="display:flex;gap:8px;align-items:center"><span style="font-size:22px">${a.i}</span><div style="flex:1"><small style="color:${LVC[a.lv]};font-weight:700">${LVN[a.lv]}</small><br><b>${a.t}</b></div></div><p class="desc" style="margin:4px 0 6px">${a.tip}</p>${a.act?`<button class="sm" data-act="${a.act}">${a.lbl}</button>`:''}</div>`;
+  h+=`<button class="sm" style="width:100%;margin-top:8px;background:#8a7a6a" data-act="advtog">${S.advOff?'🔔 Warnungen als Meldung wieder einschalten':'🔕 Keine Warnungs-Meldungen mehr (Berater bleibt im Menü)'}</button>`;
+  return h}
+let ADV_T=0,ADV_N=0,ADV_LV=0;
+function advisorTick(dt){ADV_T-=dt;if(ADV_T>0)return;ADV_T=3;const A=advice();ADV_N=A.length;ADV_LV=A.length?A[0].lv:0;
+  if(!S.advSeen)S.advSeen={};const now=new Set(A.filter(a=>a.lv>=2).map(a=>a.key));
+  for(const a of A)if(a.lv>=2&&!S.advSeen[a.key]){S.advSeen[a.key]=1;if(!S.advOff)toast(`📋 Berater: ${a.i} ${a.t} – tippe auf 📋 für einen Tipp.`);break}
+  for(const k in S.advSeen)if(!now.has(k))delete S.advSeen[k]}
 function sheetIdle(){
   const I=idleCfg(),fr=freeV().length,hp=S.vill.filter(v=>v.job&&v.job.t==='h').length,ex=S.vill.filter(v=>v.job&&v.job.t==='x'),gd=S.vill.filter(v=>v.role==='w').length,tr=S.vill.filter(v=>v.role==='t').length;
   const tg=(k,on)=>`<button class="sm" style="min-width:58px;${on?'background:#4f8a2b':'background:#8a7a6a'}" data-act="itog:${k}">${on?'AN':'AUS'}</button>`;
@@ -1691,6 +1746,7 @@ function sheetMenu(){
   <p style="margin-top:12px"><b>Spielstand laden</b></p>
   <textarea id="imp" placeholder="Spielstand hier einfügen…"></textarea>
   <button class="big" data-act="import">📥 Laden</button>
+  <button class="big" data-act="nav:advisor">📋 Dorfberater</button>
   <button class="big" data-act="fwshow">🎆 Neujahrs-Feuerwerk ansehen</button>
   <button class="danger" data-act="hchange">🔄 Hauptfigur wechseln</button>
   <button class="danger" data-act="newgame">${newConfirm?'⚠️ Wirklich neu starten? Nochmal tippen':'🆕 Neues Spiel'}</button>
@@ -1774,6 +1830,7 @@ function updateUI(){
   const nk=S.vill.length-adults();h+=`<div class="chip ${homeless()>0?'warn':''}"><span>👥</span><b>${adults()}/${popCap()}</b><small>${nk?'+'+nk+'🧒 ':''}${idle} frei</small></div>`;
   if(S.hero)h+=`<div class="chip click" data-act="hero"><span>${HEROES[S.hero.c].i}</span><b>${heroStatus()}</b></div>`;
   if(festOn())h+=`<div class="chip click" data-act="nav:village"><span>🎉</span><b>Fest</b></div>`;
+  if(ADV_N)h+=`<div class="chip click ${ADV_LV>=2?'warn':''}" data-act="nav:advisor"><span>📋</span><b>${ADV_N}</b><small>${LVN[ADV_LV]}</small></div>`;
   {const n=sickN();if(n)h+=`<div class="chip click ${n>5?'warn':''}" data-act="nav:village"><span>🤒</span><b>${n}</b><small>krank</small></div>`}
   if(S.vill.length>15){const dl=dirtLvl();if(dl>.05)h+=`<div class="chip click ${dl>.5?'warn':''}" data-act="nav:village"><span>🤢</span><b>${Math.round(dl*100)}%</b><small>Müll</small></div>`}
   if(S.rs)h+=`<div class="chip click" data-act="nav:research"><span>🔬</span><b>${Math.ceil(S.rs.t/resSpeed()/60)}m</b></div>`;
@@ -1886,6 +1943,8 @@ function act(a,p){
     case 'bye':{const n=+p;const fr=freeV().sort((a,c)=>(a.partner?1:0)-(c.partner?1:0));if(fr.length<n){toast('Nicht genug freie Bewohner');return}
       for(const v of fr.slice(0,n))leaveV(v,false);toast(`👋 ${n} Bewohner ${n>1?'sind':'ist'} freundlich weitergezogen.`);renderSheet();save();break}
     case 'fwshow':closeSheet();startFireworks(true);break;
+    case 'advtog':S.advOff=!S.advOff;renderSheet();break;
+    case 'ob':{const b=byId(+p);if(!b)return;centerOn(b.x+.5,b.y+.5);openSheet('b',b.id);break}
     case 'rdone':S.showDone=!S.showDone;renderSheet();break;
     case 'itog':{const I=idleCfg();if(p==='sweep')I.sweep=I.sweep===false;else I[p]=!I[p];if(p==='trade'&&I.trade&&!has('stall'))toast('Baue zuerst einen 🏪 Händlerstand');renderSheet();save();break}
     case 'fest':{const fc=festCost();if(festOn()||(S.festCD||0)>S.gt||freeV().length<5||!canPay(fc)){toast('Fest gerade nicht möglich');return}pay(fc);S.fest=S.gt+FEST_T;S.festCD=S.gt+FEST_CD;for(const v of freeV())v.tx=null;gainXP(30);toast('🎉 Das Dorffest beginnt! Alle feiern am Lagerfeuer.');renderSheet();save();break}
