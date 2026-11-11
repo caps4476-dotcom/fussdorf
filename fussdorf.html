@@ -1571,7 +1571,10 @@ function sheetResearch(){
   let h=`<h3>🔬 Forschung</h3><p class="desc">Forschungspunkte: <b>${fmt(S.res.research)}</b> – erzeugt im Gelehrtenhaus. Es läuft immer nur eine Forschung; jeder Gelehrte 🎓 beschleunigt sie um 5 % (aktuell ×${f1(resSpeed())}).</p>`;
   if(S.rs){const r=R[S.rs.k];h+=`<div class="item" style="display:block;border:2px solid #7c6cf0"><b>${r.i} ${r.n} wird erforscht …</b>`+bar('Fortschritt',1-S.rs.t/S.rs.T)+`<p>⏳ Noch ${Math.ceil(S.rs.t/resSpeed()/60)} Min.</p>`+dBtn('dres',S.rs.t/resSpeed())+`<button class="sm" style="background:#a04a2a" data-act="rcancel">✖ Abbrechen (alles zurück)</button></div>`}
   {const nx=Object.keys(R).filter(k=>!S.tech[k]&&!gateOk(k));if(nx.length){const g=Math.min(...nx.map(k=>RGATE[k]));h+=`<div class="item" style="display:block;border:2px solid #b0782a"><b>📖 Weitere Forschungen über die Geschichte</b><small>Nächste Freischaltung: ${gateTxt(nx.find(k=>RGATE[k]===g))} (${nx.filter(k=>RGATE[k]===g).map(k=>R[k].i+' '+R[k].n).join(', ')}).</small><button class="sm" style="margin-top:6px" data-act="nav:story">📖 Zur Geschichte</button></div>`}}
-  for(const k in R){const r=R[k],done=S.tech[k],need=(r.need||[]).filter(n=>!S.tech[n]),gl=!done&&!gateOk(k);
+  const grp=k=>{const r=R[k];if(S.tech[k])return 3;if(!gateOk(k))return 2;if((r.need||[]).some(n=>!S.tech[n]))return 1;return 0};
+  const keys=Object.keys(R).sort((a,c)=>grp(a)-grp(c)),nDone=keys.filter(k=>S.tech[k]).length,heads=['🟢 Jetzt erforschbar','🔒 Braucht andere Forschung zuerst','📖 Über die Geschichte freischalten'];let lastG=-1;
+  for(const k of keys){const r=R[k],done=S.tech[k],need=(r.need||[]).filter(n=>!S.tech[n]),gl=!done&&!gateOk(k),g=grp(k);
+    if(g!==lastG){lastG=g;if(g===3){h+=`<button class="sm" style="width:100%;margin:10px 0 4px;background:#8a7a6a" data-act="rdone">${S.showDone?'▲ Erforschte ausblenden':'▼ Erforschte anzeigen'} (${nDone})</button>`;if(!S.showDone)break}else h+=`<p style="margin:12px 0 4px"><b>${heads[g]}</b></p>`}
     let right;
     if(done)right='<b style="color:#4f8a2b">✔</b>';
     else if(gl)right='<b style="font-size:20px">📖</b>';
@@ -1883,6 +1886,7 @@ function act(a,p){
     case 'bye':{const n=+p;const fr=freeV().sort((a,c)=>(a.partner?1:0)-(c.partner?1:0));if(fr.length<n){toast('Nicht genug freie Bewohner');return}
       for(const v of fr.slice(0,n))leaveV(v,false);toast(`👋 ${n} Bewohner ${n>1?'sind':'ist'} freundlich weitergezogen.`);renderSheet();save();break}
     case 'fwshow':closeSheet();startFireworks(true);break;
+    case 'rdone':S.showDone=!S.showDone;renderSheet();break;
     case 'itog':{const I=idleCfg();if(p==='sweep')I.sweep=I.sweep===false;else I[p]=!I[p];if(p==='trade'&&I.trade&&!has('stall'))toast('Baue zuerst einen 🏪 Händlerstand');renderSheet();save();break}
     case 'fest':{const fc=festCost();if(festOn()||(S.festCD||0)>S.gt||freeV().length<5||!canPay(fc)){toast('Fest gerade nicht möglich');return}pay(fc);S.fest=S.gt+FEST_T;S.festCD=S.gt+FEST_CD;for(const v of freeV())v.tx=null;gainXP(30);toast('🎉 Das Dorffest beginnt! Alle feiern am Lagerfeuer.');renderSheet();save();break}
     case 'explore':{const fr=freeV();if(!fr.length||S.res.food<15||S.vill.filter(v=>v.job&&v.job.t==='x').length>=EXP_MAX){toast('Gerade kein Erkunder verfügbar');return}const v=fr[Math.floor(Math.random()*fr.length)];S.res.food-=15;v.job={t:'x',until:S.gt+EXP_T};v.tx=null;v.role=null;toast(`🗺️ ${v.name} zieht los, um die Gegend zu erkunden!`);renderSheet();save();break}
