@@ -340,7 +340,7 @@ function happy(){
   let jp=0;for(const b of S.buildings)if(B[b.type].joy&&!isSite(b))jp+=joyOf(B[b.type])*b.level;
   if(seasonIdx()===3)jp+=5;
   if(adults()>=6)jp+=5*(S.sec==null?1:S.sec);
-  const joy=Math.min(1,jp*2/pop*(S.hero&&S.hero.c==='lyonessa'?1.5:1)+(festOn()?.4:0));
+  const joy=Math.min(1,jp*2/pop*(S.hero&&S.hero.c==='lyonessa'?1.5:1)+(festOn()?.4:0)+(fairOn()?.3:0));
   return {food,home,joy,total:Math.max(0,Math.min(1,.4*food+.3*home+.3*joy-taxPen()-.25*dirtLvl()+(S.res.meat>1?.06:0)-.4*sickN()/Math.max(1,adults())))};
 }
 const needXP=L=>Math.round(30*Math.pow(L,1.5));
@@ -474,6 +474,55 @@ function exploreLoot(v,live){
   const txt=Object.keys(got).map(r=>`+${got[r]} ${RES[r].i}`).join(' ');
   const I=idleCfg();I.log.unshift(`🗺️ ${v.name} kam zurück: ${txt}`);I.log=I.log.slice(0,5);
   if(live)toast(`🗺️ ${v.name} ist von der Erkundung zurück: ${txt}${got.diamond?' – ein Diamant! 💎':''}`);
+}
+
+// ======================= KIRMES =======================
+const FAIR_T=1.5*DAY,FAIR_COST=400;
+const fairOn=()=>S.fair&&S.fair.until>S.gt;
+const inFair=(x,y)=>fairOn()&&x>=S.fair.x&&x<S.fair.x+S.fair.s&&y>=S.fair.y&&y<S.fair.y+S.fair.s;
+function fairSpot(){const c=S.buildings[0];if(!c)return null;
+  for(const sz of [4,3])for(let r=1;r<22;r++)for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dy))!==r)continue;const x=c.x+dx,y=c.y+dy;let ok=true;
+    for(let yy=y;yy<y+sz&&ok;yy++)for(let xx=x;xx<x+sz;xx++){if(!inMap(xx,yy)||!S.zones[zoneOf(xx,yy)]||S.tiles[xx+yy*W]!==GR||S.road[xx+yy*W]||buildingAt(xx,yy)||isMarker(xx,yy)){ok=false;break}}
+    if(ok)return {x,y,s:sz}}
+  return null}
+function startFair(live,paid){const sp=fairSpot();if(!sp){if(live)toast('🎡 Für die Kirmes ist kein Platz frei (3×3 oder 4×4 freie Wiese nahe dem Dorf nötig).');return false}
+  S.fair={...sp,until:S.gt+FAIR_T,t0:S.gt};S.fairNext=S.gt+FAIR_T+(3+Math.random()*4)*DAY;
+  if(live){toast(`🎡 Die Kirmes ist ${paid?'auf deine Einladung hin ':''}in Siedlertal angekommen! Riesenrad, Karussell und Zuckerwatte – alle sind begeistert!`);centerOn(sp.x+sp.s/2,sp.y+sp.s/2)}
+  for(const v of S.vill)v.tx=null;return true}
+function fairTick(dt,live){
+  if(S.fairNext==null)S.fairNext=S.gt+(2+Math.random()*3)*DAY;
+  if(S.fair&&S.fair.until<=S.gt){if(live)toast('🎡 Die Kirmes zieht weiter. Bis zum nächsten Mal!');S.fair=null}
+  if(!fairOn()&&S.gt>=S.fairNext){if(seasonIdx()===3||adults()<8)S.fairNext=S.gt+DAY*.5;else if(!startFair(live))S.fairNext=S.gt+DAY}
+}
+function drawFair(){
+  if(!fairOn())return;const f=S.fair,t=performance.now()/1000,px=f.x*T+2,py=f.y*T+2,Z=f.s*T-4,u=Z/4,night=darkness()>.35;
+  ctx.fillStyle='rgba(0,0,0,.25)';rr(ctx,px+3,py+4,Z,Z,10);ctx.fill();
+  ctx.fillStyle='#d9c08a';rr(ctx,px,py,Z,Z,10);ctx.fill();ctx.fillStyle='rgba(160,120,70,.25)';for(let k=0;k<14;k++){ctx.beginPath();ctx.arc(px+Z*((k*.37)%1),py+Z*((k*.61)%1),3,0,7);ctx.fill()}
+  // Autoscooter
+  const ax=px+u*.25,ay=py+Z-u*1.75,aw=u*1.6,ah=u*1.45;ctx.fillStyle='#3a3f55';rr(ctx,ax,ay,aw,ah,5);ctx.fill();ctx.strokeStyle='#ffd34d';ctx.lineWidth=1.5;rr(ctx,ax,ay,aw,ah,5);ctx.stroke();
+  for(let i=0;i<5;i++){const a=t*(.6+i*.13)+i*1.3,x=ax+aw/2+Math.cos(a)*(aw*.32)*Math.cos(a*.7+i),y=ay+ah/2+Math.sin(a*1.1)*ah*.3;ctx.fillStyle=FUNC[i%FUNC.length];rr(ctx,x-4,y-3,8,6,2);ctx.fill();ctx.fillStyle='#f5d0a9';ctx.beginPath();ctx.arc(x,y-.5,1.6,0,7);ctx.fill()}
+  // Karussell
+  const cx=px+Z-u*1.05,cy=py+Z-u*1.05,cr=u*.85;ctx.fillStyle='#b03a5a';ctx.beginPath();ctx.arc(cx,cy,cr,0,7);ctx.fill();
+  for(let i=0;i<8;i++){const a=t*.8+i*Math.PI/4;ctx.fillStyle=i%2?'#fff':'#e74c3c';ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,cr*.92,a,a+Math.PI/4);ctx.fill()}
+  for(let i=0;i<6;i++){const a=-t*.8+i*Math.PI/3,x=cx+Math.cos(a)*cr*.62,y=cy+Math.sin(a)*cr*.62+Math.sin(t*3+i)*1.2;ctx.fillStyle='#f1c40f';ctx.beginPath();ctx.arc(x,y,2.4,0,7);ctx.fill()}
+  ctx.fillStyle='#ffd34d';ctx.beginPath();ctx.arc(cx,cy,3,0,7);ctx.fill();
+  // Buden
+  const tc=[['#e74c3c','#fff'],['#2e86c1','#fff'],['#27ae60','#ffd34d']],em=['🍭','🎯','🌭'];
+  for(let i=0;i<3;i++){const bx=px+Z-u*(1.95-i*0.62),by=py+u*.22,bw=u*.55,bh=u*.6;
+    for(let k=0;k<4;k++){ctx.fillStyle=tc[i][k%2];ctx.fillRect(bx+k*bw/4,by,bw/4,bh*.45)}ctx.fillStyle='#8b5a2b';ctx.fillRect(bx,by+bh*.45,bw,bh*.55);
+    ctx.font=`${u*.32}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#000';ctx.fillText(em[i],bx+bw/2,by+bh*.75)}
+  // Riesenrad
+  const fx=px+u*1.05,fy=py+u*1.1,fr=u*.92;ctx.strokeStyle='#6b6b7a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(fx-fr*.6,fy+fr+4);ctx.lineTo(fx,fy);ctx.lineTo(fx+fr*.6,fy+fr+4);ctx.stroke();
+  ctx.strokeStyle=night?'#ffe27a':'#c0c4cc';ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(fx,fy,fr,0,7);ctx.stroke();ctx.lineWidth=.8;
+  for(let i=0;i<8;i++){const a=t*.35+i*Math.PI/4;ctx.beginPath();ctx.moveTo(fx,fy);ctx.lineTo(fx+Math.cos(a)*fr,fy+Math.sin(a)*fr);ctx.stroke()}
+  for(let i=0;i<8;i++){const a=t*.35+i*Math.PI/4,x=fx+Math.cos(a)*fr,y=fy+Math.sin(a)*fr;ctx.fillStyle=FUNC[i%FUNC.length];rr(ctx,x-3.2,y-1,6.4,5.5,1.5);ctx.fill();if(night){ctx.fillStyle='rgba(255,230,120,.8)';ctx.fillRect(x-2,y,4,2)}}
+  ctx.fillStyle='#ffd34d';ctx.beginPath();ctx.arc(fx,fy,2.6,0,7);ctx.fill();
+  // Lichterkette
+  for(let k=0;k<28;k++){const p=k/28,per=p*4,side=Math.floor(per),q=per-side;const x=side===0?px+Z*q:side===1?px+Z:side===2?px+Z*(1-q):px,y=side===0?py:side===1?py+Z*q:side===2?py+Z:py+Z*(1-q);
+    const on=Math.sin(t*4+k)>0;ctx.fillStyle=on?FUNC[k%FUNC.length]:'rgba(80,80,80,.6)';ctx.beginPath();ctx.arc(x,y,on&&night?2.4:1.6,0,7);ctx.fill();if(on&&night){ctx.fillStyle='rgba(255,240,170,.25)';ctx.beginPath();ctx.arc(x,y,6,0,7);ctx.fill()}}
+  // Besucher & Ballons
+  for(let i=0;i<10;i++){const x=px+Z*(.35+.3*((i*.53)%1))+Math.sin(t*.5+i*2)*u*.3,y=py+Z*(.4+.25*((i*.71)%1))+Math.cos(t*.4+i)*u*.2;drawPerson(x,y,FUNC[(i+3)%FUNC.length]);
+    if(i%3===0){ctx.strokeStyle='#555';ctx.lineWidth=.6;ctx.beginPath();ctx.moveTo(x+2,y-2);ctx.lineTo(x+4,y-11);ctx.stroke();ctx.fillStyle=FUNC[(i+1)%FUNC.length];ctx.beginPath();ctx.ellipse(x+4,y-13,2.6,3.2,0,0,7);ctx.fill()}}
 }
 
 // ======================= GESUNDHEIT =======================
@@ -611,6 +660,7 @@ function tick(dt,live){
   trashTick(dt,live);
   wildTick(dt);
   healthTick(dt,live);
+  fairTick(dt,live);
   if(live)advisorTick(dt);
   moodTick(dt,live);
   bankTick(dt,live);
@@ -1032,6 +1082,7 @@ function updV(v,dt){
     if(v.wait>0){v.wait-=dt;return}
     if(v.tx==null&&v.role==='s'){const hs=S.buildings.filter(b=>b.type==='house'&&!isSite(b));if(hs.length){const b=hs[Math.floor(Math.random()*hs.length)];v.tx=Math.max(.3,Math.min(W-.3,b.x+.5+(Math.random()-.5)*1.6));v.ty=Math.max(.3,Math.min(H-.3,b.y+1.15))}}
     if(v.tx==null&&!v.kid&&(v.role==='t'||festOn())){const st=v.role==='t'?S.buildings.find(b=>b.type==='stall'&&!isSite(b)):S.buildings[0];if(st){v.tx=Math.max(.3,Math.min(W-.3,st.x+.5+(Math.random()-.5)*2.6));v.ty=Math.max(.3,Math.min(H-.3,st.y+.5+(Math.random()-.5)*2.6))}}
+    if(v.tx==null&&fairOn()&&!v.kid&&Math.random()<.6){const f=S.fair;v.tx=f.x+.3+Math.random()*(f.s-.6);v.ty=f.y+.3+Math.random()*(f.s-.6)}
     if(v.tx==null&&(seasonIdx()===3||seasonIdx()===1)&&Math.random()<.5){const ws=S.buildings.filter(b=>B[b.type].wjoy&&!isSite(b));if(ws.length){const st=ws[Math.floor(Math.random()*ws.length)];v.tx=Math.max(.3,Math.min(W-.3,st.x+.5+(Math.random()-.5)*1.8));v.ty=Math.max(.3,Math.min(H-.3,st.y+1.2))}}
     if(v.tx==null){const sc=v.kid&&v.seat&&S.buildings.find(b=>b.type==='school'&&!isSite(b)),hs=S.buildings.filter(b=>B[b.type].house&&!isSite(b)),hp=v.home&&byId(v.home),h=sc||(hp&&B[hp.type].house?hp:hs[Math.floor(Math.random()*hs.length)]);v.tx=Math.max(.3,Math.min(W-.3,h.x+.5+(Math.random()-.5)*3));v.ty=Math.max(.3,Math.min(H-.3,h.y+.5+(Math.random()-.5)*3))}
     if(walk(v,v.tx,v.ty,dt,SPEED*.5)){v.tx=null;v.wait=1+Math.random()*3}
@@ -1371,6 +1422,7 @@ function thought(v){
   if(seasonIdx()!==3&&S.buildings.some(b=>b.type==='rodel'&&!isSite(b)))o.push('Auf in den Kletterpark! 🧗','Ganz schön hoch hier oben! 🌳');
   if(seasonIdx()===3&&S.buildings.some(b=>b.type==='rodel'&&!isSite(b)))o.push('Ab auf die Rodelbahn! 🛷','Wer ist schneller unten? 🛷');
   if(seasonIdx()===3&&S.buildings.some(b=>b.type==='skate'&&!isSite(b)))o.push('Eislaufen macht so Spaß! ⛸️','Ich drehe noch eine Runde ⛸️');
+  if(fairOn()&&Math.random()<.5)return pickA(['Auf zum Riesenrad! 🎡','Noch eine Runde Autoscooter! 🚗','Zuckerwatte! 🍭','Ich hab beim Dosenwerfen gewonnen! 🎯','Was für ein Rummel! 🎠']);
   if(fw)return pickA(['Frohes neues Jahr! 🎆','Prost Neujahr! 🥂','Wie schön das funkelt! ✨','Ohhh! 🎇','Aaah! 🎆']);
   if(!v.job&&festOn())o.push('Was für ein Fest! 🎉','Musik und Tanz! 💃','Noch ein Stück Kuchen? 🍰');
   if(v.job&&v.job.t==='i')o.push('Was mag hier verborgen sein? 🔍','Ein seltsamer Ort …');
@@ -1453,6 +1505,7 @@ function render(dt){
   drawXmas();
   DLV=dirtLvl();
   drawWild();
+  drawFair();
   for(const b of S.buildings)if(vis(b.x,b.y)||(B[b.type].fw&&vis(b.x+fpW(b.type)-1,b.y+fpH(b.type)-1))){if(placing&&placing.move===b.id)ctx.globalAlpha=.35;drawBuilding(b,cnt);if(b.type==='house'&&DLV>.12&&!isSite(b))drawBags(b);ctx.globalAlpha=1;if(demoMode&&demoTarget&&demoTarget.k==='b'&&demoTarget.id===b.id){ctx.fillStyle='rgba(255,60,40,.45)';ctx.fillRect(b.x*T,b.y*T,T*fpW(b.type),T*fpH(b.type));ctx.font=`${T*.5}px sans-serif`;ctx.fillText('❌',(b.x+fpW(b.type)/2)*T,(b.y+fpH(b.type)/2)*T)}}
   const vs=S.vill.filter(v=>vis(v.x,v.y)).sort((a,b)=>a.y-b.y);
   for(const v of vs)if(!v.asleep&&!v.inH&&!(v.job&&v.job.t==='x'))drawV(v);
@@ -1531,7 +1584,7 @@ cv.addEventListener('wheel',e=>{e.preventDefault();const wx=cam.x+e.clientX/cam.
 const fpW=t=>B[t].fw||1,fpH=t=>B[t].fh||1;
 function buildingAt(x,y){return S.buildings.find(b=>x>=b.x&&x<b.x+fpW(b.type)&&y>=b.y&&y<b.y+fpH(b.type))}
 function validPlace(x,y,t){t=t||(placing&&placing.type);if(t&&(B[t].fw||B[t].fh)){for(let yy=y;yy<y+fpH(t);yy++)for(let xx=x;xx<x+fpW(t);xx++)if(!validTile(xx,yy))return false;return true}return validTile(x,y)}
-function validTile(x,y){const o=buildingAt(x,y);return inMap(x,y)&&S.zones[zoneOf(x,y)]&&S.tiles[x+y*W]===GR&&!S.road[x+y*W]&&!isMarker(x,y)&&!(xmas&&seasonIdx()===3&&xmas.x===x&&xmas.y===y)&&(!o||(placing&&o.id===placing.move))}
+function validTile(x,y){const o=buildingAt(x,y);return inMap(x,y)&&!inFair(x,y)&&S.zones[zoneOf(x,y)]&&S.tiles[x+y*W]===GR&&!S.road[x+y*W]&&!isMarker(x,y)&&!(xmas&&seasonIdx()===3&&xmas.x===x&&xmas.y===y)&&(!o||(placing&&o.id===placing.move))}
 const clearYield=i=>Math.floor(S.amt[i]/2);
 function doClear(i){const t=S.tiles[i],nd=NODE[t];if(!nd)return;const y=clearYield(i);if(y)addRes(nd.r,y);S.tiles[i]=GR;S.amt[i]=0;S.rt[i]=0;
   const x=i%W,yy=(i/W)|0;for(const v of S.vill)if(v.job&&v.job.t==='g'&&v.job.x===x&&v.job.y===yy){const a=findAlt(x,yy,t);if(a){v.job.x=a.x;v.job.y=a.y;if(v.ph!=='back')v.ph='go'}}
@@ -1783,6 +1836,7 @@ function sheetMenu(){
   <textarea id="imp" placeholder="Spielstand hier einfügen…"></textarea>
   <button class="big" data-act="import">📥 Laden</button>
   <button class="big" data-act="nav:advisor">📋 Dorfberater</button>
+  ${fairOn()?`<button class="big" data-act="gofair">🎡 Zur Kirmes (noch ${Math.ceil((S.fair.until-S.gt)/60)} Min.)</button>`:`<button class="big" data-act="fairinv" ${S.res.gold>=FAIR_COST&&seasonIdx()!==3?'':'disabled'}>🎡 Kirmes einladen (${FAIR_COST} 💰${seasonIdx()===3?' – nicht im Winter':''})</button><p class="desc">Sonst kommt sie ab und zu von selbst – nächster Besuch in ca. ${Math.max(1,Math.ceil(((S.fairNext||0)-S.gt)/60))} Min.</p>`}
   <button class="big" data-act="fwshow">🎆 Neujahrs-Feuerwerk ansehen</button>
   <button class="danger" data-act="hchange">🔄 Hauptfigur wechseln</button>
   <button class="danger" data-act="newgame">${newConfirm?'⚠️ Wirklich neu starten? Nochmal tippen':'🆕 Neues Spiel'}</button>
@@ -1866,6 +1920,7 @@ function updateUI(){
   const nk=S.vill.length-adults();h+=`<div class="chip ${homeless()>0?'warn':''}"><span>👥</span><b>${adults()}/${popCap()}</b><small>${nk?'+'+nk+'🧒 ':''}${idle} frei</small></div>`;
   if(S.hero)h+=`<div class="chip click" data-act="hero"><span>${HEROES[S.hero.c].i}</span><b>${heroStatus()}</b></div>`;
   if(festOn())h+=`<div class="chip click" data-act="nav:village"><span>🎉</span><b>Fest</b></div>`;
+  if(fairOn())h+=`<div class="chip click" data-act="gofair"><span>🎡</span><b>Kirmes</b><small>${Math.ceil((S.fair.until-S.gt)/60)}m</small></div>`;
   if(ADV_N)h+=`<div class="chip click ${ADV_LV>=2?'warn':''}" data-act="nav:advisor"><span>📋</span><b>${ADV_N}</b><small>${LVN[ADV_LV]}</small></div>`;
   {const n=sickN();if(n)h+=`<div class="chip click ${n>5?'warn':''}" data-act="nav:village"><span>🤒</span><b>${n}</b><small>krank</small></div>`}
   if(S.vill.length>15){const dl=dirtLvl();if(dl>.05)h+=`<div class="chip click ${dl>.5?'warn':''}" data-act="nav:village"><span>🤢</span><b>${Math.round(dl*100)}%</b><small>Müll</small></div>`}
@@ -1979,6 +2034,8 @@ function act(a,p){
     case 'bye':{const n=+p;const fr=freeV().sort((a,c)=>(a.partner?1:0)-(c.partner?1:0));if(fr.length<n){toast('Nicht genug freie Bewohner');return}
       for(const v of fr.slice(0,n))leaveV(v,false);toast(`👋 ${n} Bewohner ${n>1?'sind':'ist'} freundlich weitergezogen.`);renderSheet();save();break}
     case 'fwshow':closeSheet();startFireworks(true);break;
+    case 'gofair':if(fairOn()){closeSheet();centerOn(S.fair.x+S.fair.s/2,S.fair.y+S.fair.s/2);toast(`🎡 Kirmes: +30 % Freude, noch ${Math.ceil((S.fair.until-S.gt)/60)} Min.`)}break;
+    case 'fairinv':{if(fairOn()||S.res.gold<FAIR_COST||seasonIdx()===3)return;if(startFair(true,true)){S.res.gold-=FAIR_COST;closeSheet()}break}
     case 'advtog':S.advOff=!S.advOff;renderSheet();break;
     case 'ob':{const b=byId(+p);if(!b)return;centerOn(b.x+.5,b.y+.5);openSheet('b',b.id);break}
     case 'rdone':S.showDone=!S.showDone;renderSheet();break;
