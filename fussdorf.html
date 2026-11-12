@@ -146,6 +146,7 @@ const B={
   hunter:{n:'Jägerhütte',i:'🏹',roof:'#5a4a2a',cost:{wood:25,stone:5},slots:2,prod:{meat:.05},near:TR,r:2,wild:1,req:'hunting',desc:'Jäger erlegen Wild im Wald (Bäume im Radius 2) und liefern 🥩 Fleisch. Achtung: Zu viel Jagd dezimiert den Wildbestand – dann sinkt die Beute.'},
   ranch:{n:'Tierfarm',i:'🐄',roof:'#8a6a3a',fw:2,fh:2,cost:{wood:50,planks:30,stone:20},slots:3,conv:{in:{grain:.15},out:{cattle:.05}},req:'husbandry',desc:'Große Weide (2×2): Bauern ziehen mit Getreide als Futter 🐄 Vieh groß.'},
   butcher:{n:'Metzgerei',i:'🔪',roof:'#a33a3a',cost:{stone:30,planks:20},slots:2,conv:{in:{cattle:.04},out:{meat:.3}},req:'husbandry',desc:'Der Metzger verarbeitet 🐄 Vieh zu 🥩 Fleisch.'},
+  tradepost:{n:'Handelskontor',i:'🐴',roof:'#7a5a3a',fw:2,fh:2,cost:{planks:50,stone:40,gold:120},req:'market',desc:'Großes Kontor (2×2): Schickt Karawanen zu Nachbardörfern. Pro Stufe 1 Handelsroute und +30 Ladung pro Fahrt. Tausche Überschuss gegen Gold oder Waren, die du brauchst.'},
   dump:{n:'Müllplatz',i:'🚛',roof:'#5a6a3a',cost:{wood:40,stone:30,planks:15},slots:2,desc:'Müllmänner sammeln den Müll im Dorf ein und lagern ihn auf der Halde (400 pro Stufe, eigenes Lager). Auf der Halde verrotten 25 Müll pro Min. und Stufe. Ab ca. 15 Einwohnern entsteht Müll – liegt er herum, sinkt die Zufriedenheit. Mit „Müllverbrennung“ heizt der Müll dein Kraftwerk.'},
   rodel:{n:'Rodelbahn & Kletterpark',i:'🛷',roof:'#8fb0c4',fw:2,fh:3,cost:{wood:40,planks:15},joy:1,wjoy:10,sj:[8,8,7,10],sn:['🧗 Kletterpark','🧗 Kletterpark','🧗 Kletterpark','🛷 Rodelbahn'],desc:'Großer Hang (2×3 Felder): Im Winter 🛷 Rodelbahn (+10 Freude pro Stufe), von Frühling bis Herbst 🧗 Kletterpark mit Seilen zwischen den Bäumen (+7–8 Freude pro Stufe).'},
   skate:{n:'Eisbahn & Freibad',i:'⛸️',roof:'#6f9fc0',fw:3,fh:2,cost:{stone:30,planks:20,gold:20},joy:1,wjoy:12,sj:[5,12,3,12],sn:['🏊 Freibad','🏊 Freibad','🏊 Freibad (Nebensaison)','⛸️ Eisbahn'],desc:'Große Fläche (3×2 Felder): Im Winter ⛸️ Eisbahn (+12 Freude pro Stufe), im Sommer 🏊 Freibad (+12), im Frühling +5, im Herbst +3.'},
@@ -476,6 +477,79 @@ function exploreLoot(v,live){
   if(live)toast(`🗺️ ${v.name} ist von der Erkundung zurück: ${txt}${got.diamond?' – ein Diamant! 💎':''}`);
 }
 
+// ======================= HANDELSROUTEN =======================
+const VIL=[
+ {id:'muehl',n:'Mühlbach',i:'🌾',dist:3,ang:-1.9,want:{planks:1.5,tools:1.4,stone:1.3},offer:{grain:.75,flour:.85,food:.9},desc:'Ein Bauerndorf im Norden mit fruchtbaren Feldern.'},
+ {id:'stein',n:'Steinfurt',i:'⛰️',dist:4,ang:-.4,want:{food:1.6,wood:1.5,meat:1.5},offer:{stone:.7,ore:.8},desc:'Ein Bergdorf voller Steinbrüche.'},
+ {id:'fisch',n:'Fischersand',i:'🐟',dist:5,ang:1.1,want:{iron:1.45,planks:1.35,grain:1.3},offer:{food:.7,meat:.85},desc:'Ein Fischerdorf an der Küste.'},
+ {id:'eisen',n:'Eisenhausen',i:'⚒️',dist:6,ang:2.5,want:{grain:1.5,meat:1.6,food:1.4,wood:1.3},offer:{iron:.8,tools:.85,ore:.75},desc:'Eine Schmiedestadt in den Hügeln.'},
+ {id:'koenig',n:'Königsstadt',i:'👑',dist:9,ang:3.6,lv:3,want:{tools:1.6,iron:1.5,diamond:1.4,meat:1.4},offer:{},desc:'Die reiche Hauptstadt – zahlt nur in Gold, aber gut. Ab Kontor-Stufe 3.'}];
+const vilById=id=>VIL.find(v=>v.id===id);
+const kontors=()=>S.buildings.filter(b=>b.type==='tradepost'&&!isSite(b));
+const kontorLv=()=>Math.max(0,...kontors().map(b=>b.level));
+const routeMax=()=>kontors().reduce((a,b)=>a+b.level,0);
+const routeCap=()=>30+30*kontorLv();
+const vFriend=v=>Math.min(6,Math.floor(((S.vfr||{})[v]||0)/8));
+function vSat(v,r){return ((S.vsat||{})[v]||{})[r]||0}
+function tradeValue(vid,r,n){const v=vilById(vid);return n*PRICE[r]*(v.want[r]||.6)*(1+.05*vFriend(vid))/(1+vSat(vid,r)/120)}
+function routeTick(dt,live){
+  if(!S.routes)S.routes=[];if(!S.vsat)S.vsat={};if(!S.vfr)S.vfr={};
+  const dec=Math.exp(-dt/(2*DAY));for(const v in S.vsat)for(const r in S.vsat[v])S.vsat[v][r]*=dec;
+  const hasK=kontors().length;
+  S.routes.forEach((rt,i)=>{const v=vilById(rt.v);if(!v)return;
+    if(rt.st==='home'){if(!rt.on||!hasK||i>=routeMax())return;const n=Math.min(rt.n,routeCap());if(S.res[rt.out]>=n&&n>0){S.res[rt.out]-=n;rt.cargo=n;rt.st='out';rt.t=v.dist*60}return}
+    rt.t-=dt;if(rt.t>0)return;
+    if(rt.st==='out'){const val=tradeValue(rt.v,rt.out,rt.cargo);S.vsat[rt.v]=S.vsat[rt.v]||{};S.vsat[rt.v][rt.out]=(S.vsat[rt.v][rt.out]||0)+rt.cargo;S.vfr[rt.v]=(S.vfr[rt.v]||0)+1;
+      if(rt.back&&v.offer[rt.back]){rt.ret={r:rt.back,n:Math.floor(val/(PRICE[rt.back]*v.offer[rt.back]))}}else rt.ret={r:'gold',n:Math.round(val)};
+      rt.st='back';rt.t=v.dist*60;return}
+    if(rt.st==='back'){const g=rt.ret;if(g.r==='gold'){GSRC='🐴 Handelsrouten';earn(g.n);GSRC=null}else addRes(g.r,g.n);
+      rt.last=`${rt.cargo} ${RES[rt.out].i} → ${fmt(g.n)} ${RES[g.r].i}`;rt.trips=(rt.trips||0)+1;
+      if(live&&!S.routeQuiet)toast(`🐴 Karawane aus ${v.i} ${v.n} zurück: ${rt.last}`);
+      rt.st='home';rt.cargo=0;rt.ret=null}
+  });
+}
+function sheetRoutes(){
+  const K=kontors();let h=`<h3>🐴 Handelsrouten</h3>`;
+  if(!K.length)return h+`<p class="desc">Baue zuerst ein 🐴 Handelskontor (Forschung: Handel).</p>`;
+  h+=`<p class="desc">Routen: ${S.routes.length}/${routeMax()} · Ladung pro Fahrt bis ${routeCap()}. Karawanen fahren automatisch hin und her, sobald genug Ware im Lager ist. Je öfter ein Dorf beliefert wird, desto weniger zahlt es (erholt sich mit der Zeit) – aber die Freundschaft wächst.</p>`;
+  S.routes.forEach((rt,i)=>{const v=vilById(rt.v),act=i<routeMax(),val=tradeValue(rt.v,rt.out,Math.min(rt.n,routeCap())),ret=rt.back&&v.offer[rt.back]?`${Math.floor(val/(PRICE[rt.back]*v.offer[rt.back]))} ${RES[rt.back].i}`:`${Math.round(val)} 💰`;
+    const st=!act?'⛔ Kontor-Stufe zu niedrig':!rt.on?'⏸️ Pausiert':rt.st==='home'?(S.res[rt.out]>=Math.min(rt.n,routeCap())?'🐴 Bricht gleich auf':`⏳ Wartet auf ${Math.min(rt.n,routeCap())} ${RES[rt.out].i}`):rt.st==='out'?`➡️ Unterwegs nach ${v.n} (${Math.ceil(rt.t/60)} Min.)`:`⬅️ Auf dem Rückweg (${Math.ceil(rt.t/60)} Min.)`;
+    const sel=(k,opts,cur)=>`<select data-chg="${k}:${i}" style="font-size:14px;padding:4px;border-radius:6px;max-width:100%">${opts.map(([val,l])=>`<option value="${val}" ${val===cur?'selected':''}>${l}</option>`).join('')}</select>`;
+    const outs=Object.keys(PRICE).filter(r=>r!=='food'||true).map(r=>[r,`${RES[r].i} ${RES[r].n}${v.want[r]?' ★':''}`]);
+    const backs=[['','💰 Gold'],...Object.keys(v.offer).map(r=>[r,`${RES[r].i} ${RES[r].n}`])];
+    h+=`<div class="item" style="display:block;padding:9px 10px;border-left:5px solid ${rt.on&&act?'#4f8a2b':'#8a7a6a'}">
+     <b>Route ${i+1}: ${v.i} ${v.n}</b> <small>(${v.dist} Min. pro Weg${vFriend(rt.v)?` · 🤝 Freundschaft ${vFriend(rt.v)}`:''})</small>
+     <p style="margin:4px 0">${st}</p>
+     <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;font-size:14px">
+      <span>Ziel</span>${sel('rv',VIL.filter(x=>!x.lv||kontorLv()>=x.lv).map(x=>[x.id,x.i+' '+x.n]),rt.v)}
+      <span>Liefern</span>${sel('ro',outs,rt.out)}
+      <span>Zurück</span>${sel('rb',backs,rt.back||'')}
+     </div>
+     <div class="row" style="gap:5px;margin-top:6px;align-items:center"><button class="sm" data-act="rn:${i}:-10">−10</button><b style="flex:1;text-align:center">${Math.min(rt.n,routeCap())} ${RES[rt.out].i} pro Fahrt</b><button class="sm" data-act="rn:${i}:10">+10</button></div>
+     <p class="desc" style="margin:5px 0">Pro Fahrt ca. <b>${Math.min(rt.n,routeCap())} ${RES[rt.out].i} → ${ret}</b>${rt.last?` · Letzte Fahrt: ${rt.last}`:''}</p>
+     <div class="row" style="gap:5px"><button class="sm" data-act="rtog:${i}">${rt.on?'⏸️ Pausieren':'▶️ Starten'}</button>${rt.st==='home'?`<button class="sm danger" data-act="rdel:${i}">🗑️ Löschen</button>`:''}</div></div>`});
+  if(S.routes.length<routeMax())h+=`<button class="big" data-act="radd">➕ Neue Handelsroute</button>`;
+  else h+=`<p class="desc">Für mehr Routen das Handelskontor ausbauen oder ein weiteres bauen.</p>`;
+  h+=`<p style="margin-top:12px"><b>🗺️ Nachbardörfer</b></p>`;
+  for(const v of VIL){const lock=v.lv&&kontorLv()<v.lv;h+=`<div class="item ${lock?'locked':''}" style="display:block;padding:7px 10px"><b>${v.i} ${v.n}</b> <small>${v.dist} Min. entfernt${lock?` · 🔒 ab Kontor-Stufe ${v.lv}`:''}</small><small>${v.desc}</small>
+    <small>★ Kauft gern: ${Object.keys(v.want).map(r=>`${RES[r].i} ×${v.want[r]}${vSat(v.id,r)>5?' (gesättigt '+Math.round(100-100/(1+vSat(v.id,r)/120))+' %)':''}`).join(' · ')}</small>
+    <small>${Object.keys(v.offer).length?'Bietet günstig: '+Object.keys(v.offer).map(r=>RES[r].i+' '+RES[r].n).join(', '):'Zahlt nur in Gold'}</small></div>`}
+  h+=`<button class="sm" style="width:100%;margin-top:6px;background:#8a7a6a" data-act="rquiet">${S.routeQuiet?'🔔 Rückkehr-Meldungen einschalten':'🔕 Rückkehr-Meldungen ausschalten'}</button>`;
+  return h}
+function drawCaravans(){
+  if(!S.routes||!S.routes.length)return;const K=kontors()[0];if(!K)return;const t=performance.now()/1000;
+  const sx=(K.x+fpW(K.type)/2)*T,sy=(K.y+fpH(K.type)/2)*T;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  S.routes.forEach((rt,i)=>{if(rt.st!=='out'&&rt.st!=='back')return;const v=vilById(rt.v);if(!v)return;const D=v.dist*60,prog=rt.st==='out'?1-rt.t/D:rt.t/D,vis=prog/.3;if(prog>.3)return;
+    const len=6*T,x=sx+Math.cos(v.ang)*len*vis,y=sy+Math.sin(v.ang)*len*vis+Math.sin(t*6+i)*.6;
+    ctx.fillStyle='rgba(0,0,0,.2)';ctx.beginPath();ctx.ellipse(x,y+6,9,2.5,0,0,7);ctx.fill();
+    const dir=Math.cos(v.ang)*(rt.st==='out'?1:-1)>=0?1:-1;ctx.save();ctx.translate(x,y);ctx.scale(-dir,1);
+    ctx.fillStyle='#8b5a2b';ctx.fillRect(2,-3,10,6);ctx.fillStyle='#e8dcc0';ctx.beginPath();ctx.arc(7,-3,5,Math.PI,0);ctx.fill();
+    ctx.fillStyle='#3a2a1a';ctx.beginPath();ctx.arc(4,4,2,0,7);ctx.arc(10,4,2,0,7);ctx.fill();
+    ctx.font=`${T*.45}px sans-serif`;ctx.fillStyle='#000';ctx.fillText('🐴',-5,0);ctx.restore();
+    ctx.font='8px sans-serif';ctx.fillText(rt.st==='out'?RES[rt.out].i:(rt.ret?RES[rt.ret.r].i:''),x,y-10)});
+}
+
 // ======================= KIRMES =======================
 const FAIR_T=1.5*DAY,FAIR_COST=400;
 const fairOn=()=>S.fair&&S.fair.until>S.gt;
@@ -661,6 +735,7 @@ function tick(dt,live){
   wildTick(dt);
   healthTick(dt,live);
   fairTick(dt,live);
+  routeTick(dt,live);
   if(live)advisorTick(dt);
   moodTick(dt,live);
   bankTick(dt,live);
@@ -1506,6 +1581,7 @@ function render(dt){
   DLV=dirtLvl();
   drawWild();
   drawFair();
+  drawCaravans();
   for(const b of S.buildings)if(vis(b.x,b.y)||(B[b.type].fw&&vis(b.x+fpW(b.type)-1,b.y+fpH(b.type)-1))){if(placing&&placing.move===b.id)ctx.globalAlpha=.35;drawBuilding(b,cnt);if(b.type==='house'&&DLV>.12&&!isSite(b))drawBags(b);ctx.globalAlpha=1;if(demoMode&&demoTarget&&demoTarget.k==='b'&&demoTarget.id===b.id){ctx.fillStyle='rgba(255,60,40,.45)';ctx.fillRect(b.x*T,b.y*T,T*fpW(b.type),T*fpH(b.type));ctx.font=`${T*.5}px sans-serif`;ctx.fillText('❌',(b.x+fpW(b.type)/2)*T,(b.y+fpH(b.type)/2)*T)}}
   const vs=S.vill.filter(v=>vis(v.x,v.y)).sort((a,b)=>a.y-b.y);
   for(const v of vs)if(!v.asleep&&!v.inH&&!(v.job&&v.job.t==='x'))drawV(v);
@@ -1636,6 +1712,7 @@ function renderSheet(){
     case 'research':h=sheetResearch();break;
     case 'village':h=sheetVillage();break;
     case 'advisor':h=sheetAdvisor();break;
+    case 'routes':h=sheetRoutes();break;
     case 'menu':h=sheetMenu();break;
     case 'b':{const b=byId(sheetArg);if(!b){closeSheet();return}h=sheetBuilding(b);break}
     case 'node':h=sheetNode(sheetArg.x,sheetArg.y);break;
@@ -1790,6 +1867,7 @@ function advice(){
   // Zufriedenheit
   {const H=happy();if(H.total<LEAVE_AT+.1){const why=[];if(taxPen()>.1)why.push('Steuern senken');if(H.food<.7)why.push('Nahrung sichern');if(H.home<.6)why.push('mehr Wohnraum');if(dirtLvl()>.3)why.push('Müll beseitigen');if(sickN()>ad*.06)why.push('Kranke heilen');if(H.joy<.4)why.push('Freude-Gebäude bauen (Taverne, Brunnen, Bahnen …)');
     add(H.total<LEAVE_AT?3:2,'😟',`Zufriedenheit nur ${Math.round(H.total*100)} %${H.total<LEAVE_AT?' – Bewohner ziehen weg!':''}`,why.length?'Am meisten hilft: '+why.join(', ')+'.':'Baue mehr Freude-Gebäude.','nav:village','👥 Zum Dorf','happy')}}
+  if(kontors().length&&!(S.routes||[]).some(r=>r.on)){const full=Object.keys(PRICE).filter(r=>isFinite(cap(r))&&S.res[r]>=cap(r)*.9);if(full.length)add(0,'🐴','Überschuss für den Handel',`Dein Lager ist bei ${full.map(r=>RES[r].i).join(' ')} fast voll. Richte eine Handelsroute ein und tausche den Überschuss.`,'nav:routes','🐴 Handelsrouten','routes')}
   // Unbesetzte Betriebe
   {const empty=S.buildings.filter(b=>!isSite(b)&&B[b.type].slots&&!wcount(b)&&!['uni','garage','school'].includes(b.type));
    if(empty.length&&fr)add(1,'👷',`${empty.length} Betrieb${empty.length>1?'e':''} ohne Arbeiter`,`z. B. ${B[empty[0].type].i} ${B[empty[0].type].n}. Du hast ${fr} freie Bewohner – tippe das Gebäude an und füge Arbeiter hinzu.`,'ob:'+empty[0].id,'👷 Hinschauen','empty')}
@@ -1863,6 +1941,7 @@ function sheetBuilding(b){
   if(d.house)h+=`<p>🛏️ Wohnplätze: <b>${beds(b)}</b></p>`;
   if(d.joy)h+=`<p>🎉 Freude: <b>+${joyOf(d)*b.level}</b>${d.sj?` · jetzt: <b>${d.sn[seasonIdx()]}</b><br><small>${['🌸','☀️','🍂','❄️'].map((x,i)=>x+' +'+d.sj[i]*b.level).join(' · ')}</small>`:''}</p>`;
   if(d.store)h+=`<p>📥 Abgabestelle für Sammler</p>`;
+  if(b.type==='tradepost'&&!isSite(b)){const on=(S.routes||[]).filter(r=>r.on).length;h+=`<p>🐴 ${(S.routes||[]).length}/${routeMax()} Routen · ${on} aktiv · Ladung bis ${routeCap()}</p><button class="big" data-act="nav:routes">🐴 Handelsrouten verwalten</button>`}
   if(b.type==='hospital'&&!isSite(b)){const inH=S.vill.filter(v=>v.sick>0&&v.hosp===b.id);h+=`<p>🛏️ Betten: <b>${inH.length}/${hospBeds(b)}</b> belegt${hospBeds(b)?'':' – stelle Ärzte ein!'}</p>`+(inH.length?`<p class="desc">${inH.map(v=>v.name).join(', ')}</p>`:'')}
   if(b.type==='herbs'&&!isSite(b))h+=`<p>🤒 ${sickN()} Kranke im Dorf</p>`;
   if(d.wild){const wf=wildF();h+=bar('🦌 Wildbestand',wf)+`<p class="desc">${wf<.3?'⚠️ Das Wild wird knapp – weniger jagen, damit es sich erholt!':wf<.6?'Der Bestand sinkt. Achte auf nachhaltige Jagd.':'Der Wald ist voller Wild.'} Im Winter vermehrt es sich langsamer. Mehr Wald = mehr Wild.</p>`}
@@ -2036,6 +2115,11 @@ function act(a,p){
     case 'fwshow':closeSheet();startFireworks(true);break;
     case 'gofair':if(fairOn()){closeSheet();centerOn(S.fair.x+S.fair.s/2,S.fair.y+S.fair.s/2);toast(`🎡 Kirmes: +30 % Freude, noch ${Math.ceil((S.fair.until-S.gt)/60)} Min.`)}break;
     case 'fairinv':{if(fairOn()||S.res.gold<FAIR_COST||seasonIdx()===3)return;if(startFair(true,true)){S.res.gold-=FAIR_COST;closeSheet()}break}
+    case 'radd':{if(!S.routes)S.routes=[];if(S.routes.length>=routeMax())return;S.routes.push({v:'muehl',out:'planks',n:Math.min(30,routeCap()),back:'',on:false,st:'home',t:0});renderSheet();save();break}
+    case 'rdel':{const rt=S.routes[+p];if(rt&&rt.st==='home'){S.routes.splice(+p,1);renderSheet();save()}break}
+    case 'rtog':{const rt=S.routes[+p];if(rt){rt.on=!rt.on;renderSheet();save()}break}
+    case 'rn':{const [i,dn]=p.split(':');const rt=S.routes[+i];if(rt){rt.n=Math.max(10,Math.min(routeCap(),Math.min(rt.n,routeCap())+ +dn));renderSheet();save()}break}
+    case 'rquiet':S.routeQuiet=!S.routeQuiet;renderSheet();break;
     case 'advtog':S.advOff=!S.advOff;renderSheet();break;
     case 'ob':{const b=byId(+p);if(!b)return;centerOn(b.x+.5,b.y+.5);openSheet('b',b.id);break}
     case 'rdone':S.showDone=!S.showDone;renderSheet();break;
@@ -2049,7 +2133,7 @@ function act(a,p){
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el||!el.dataset.act||el.disabled)return;const s=el.dataset.act,k=s.indexOf(':');act(k<0?s:s.slice(0,k),k<0?null:s.slice(k+1))});
 $('goal').addEventListener('click',()=>$('goal').classList.toggle('min'));
 document.addEventListener('input',e=>{if(e.target.id==='popr'){taxDrag=true;const v=+e.target.value;S.popMax=v>=+e.target.max?null:v;const el=$('popinfo');if(el)el.innerHTML=popInfo();return}if(e.target.id!=='taxr')return;taxDrag=true;S.taxR=Math.round(+e.target.value*10)/10;const el=$('taxinfo');if(el)el.innerHTML=taxInfo();{const m=$('moodl'),t=happy().total;if(m)m.innerHTML=`<b>${moodI(t)} Zufriedenheit ${Math.round(t*100)} %</b> → Produktion ×${f1(.8+.4*t)}`}updateUI()});
-document.addEventListener('change',e=>{if(e.target.id==='popr'){taxDrag=false;toast(S.popMax==null?'🚪 Zuzug: unbegrenzt':`🚪 Höchstens ${S.popMax} Einwohner`);save();renderSheet();return}if(e.target.id!=='taxr')return;taxDrag=false;S.taxR=Math.round(+e.target.value*10)/10;toast(`💰 Steuersatz: ${f1(S.taxR)} Gold pro Kopf`);save();renderSheet()});
+document.addEventListener('change',e=>{const c=e.target.dataset&&e.target.dataset.chg;if(c){const [k,i]=c.split(':'),rt=S.routes&&S.routes[+i];if(!rt)return;const val=e.target.value;if(k==='rv'){rt.v=val;const v=vilById(val);if(rt.back&&!v.offer[rt.back])rt.back=''}if(k==='ro')rt.out=val;if(k==='rb')rt.back=val;renderSheet();save();return}if(e.target.id==='popr'){taxDrag=false;toast(S.popMax==null?'🚪 Zuzug: unbegrenzt':`🚪 Höchstens ${S.popMax} Einwohner`);save();renderSheet();return}if(e.target.id!=='taxr')return;taxDrag=false;S.taxR=Math.round(+e.target.value*10)/10;toast(`💰 Steuersatz: ${f1(S.taxR)} Gold pro Kopf`);save();renderSheet()});
 document.addEventListener('pointerdown',e=>{if(e.target.id==='taxr'||e.target.id==='popr')taxDrag=true});
 document.addEventListener('pointerup',()=>{if(taxDrag){setTimeout(()=>{if(document.activeElement&&(document.activeElement.id==='taxr'||document.activeElement.id==='popr'))document.activeElement.blur();taxDrag=false},300)}});
 
