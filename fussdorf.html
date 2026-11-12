@@ -424,6 +424,7 @@ function load(){try{const s=localStorage.getItem(KEY);if(s){const o=JSON.parse(s
 // ======================= FREIE BEWOHNER =======================
 const HELP=.3,EXP_T=300,EXP_MAX=3,FEST_T=DAY,FEST_CD=2*DAY;
 const freeV=()=>S.vill.filter(v=>!v.job&&!v.kid&&!(v.sick>0));
+const tradeDayCap=()=>40*(1+stallLv());
 const festOn=()=>S.fest&&S.fest>S.gt;
 const guardNeed=()=>Math.max(1,Math.ceil(adults()/8));
 const stallLv=()=>Math.max(0,...S.buildings.filter(b=>b.type==='stall'&&!isSite(b)).map(b=>b.level));
@@ -455,9 +456,9 @@ function idleTick(dt,live){
       else if(gi&&live&&adults()>=8&&Math.random()<.25)toast('🛡️ Die Dorfwache hat in der Nacht Diebe vertrieben!')}}
   // --- Straßenhändler ---
   if(ti){I.tt=(I.tt||0)+dt;
-    if(I.tt>=20){const k=Math.floor(I.tt/20);I.tt-=20*k;let g=0;
-      for(const r in PRICE){if(r==='diamond'||r==='food')continue;const c=cap(r),lim=c*.8;if(!isFinite(c)||S.res[r]<=lim)continue;
-        const n=Math.min(S.res[r]-lim,ti*k);if(n<.5)continue;const m=S.mkt[r];if(m.f<=.55)continue;const f0=m.f,f1=Math.max(.4,f0-pDrop(r,n));g+=PRICE[r]*(f0+f1)/2*n*tradeBonus()*.8;m.f=f1;S.res[r]-=n}
+    if(I.tt>=20){const k=Math.floor(I.tt/20);I.tt-=20*k;let g=0;if(I.tday!==dayNo()){I.tday=dayNo();I.tg=0}const bud=Math.max(0,tradeDayCap()-I.tg);
+      for(const r in PRICE){if(g>=bud)break;if(r==='diamond'||r==='food')continue;const c=cap(r),lim=c*.8;if(!isFinite(c)||S.res[r]<=lim)continue;
+        let n=Math.min(S.res[r]-lim,ti*k);if(n<.5)continue;const m=S.mkt[r];if(m.f<=.55)continue;const unit=PRICE[r]*m.f*tradeBonus()*.8;if(unit>0)n=Math.min(n,(bud-g)/unit);if(n<.2)continue;const f0=m.f,f1=Math.max(.4,f0-pDrop(r,n));g+=PRICE[r]*(f0+f1)/2*n*tradeBonus()*.8;m.f=f1;S.res[r]-=n}
       if(g>0){if(I.tday!==dayNo()){I.tday=dayNo();I.tg=0}I.tg+=g;GSRC='🛒 Straßenhändler';earn(g);GSRC=null}}}
 }
 function exploreLoot(v,live){
@@ -1766,7 +1767,7 @@ function sheetIdle(){
   h+=`<div class="item"><div class="ic">🧹</div><div class="tx"><b>Straßenfeger</b><small>Tagsüber sammeln bis zu ${Math.ceil(adults()/10)} freie Bewohner herumliegenden Müll auf (je ${SWEEP_C*60} pro Min.). Aktiv: ${S.vill.filter(v=>v.role==='s').length}</small></div>${tg('sweep',I.sweep!==false)}</div>`;
   const sec=S.sec==null?1:S.sec;
   h+=`<div class="item"><div class="ic">🛡️</div><div class="tx"><b>Dorfwache</b><small>Nachts patrouillieren ${guardNeed()} freie Bewohner statt zu schlafen. Schützt vor Dieben, gibt Freude. Sicherheit: ${Math.round(sec*100)} %${isNight()?` · Wachen: ${gd}`:''}</small></div>${tg('guard',I.guard)}</div>`;
-  h+=`<div class="item"><div class="ic">🛒</div><div class="tx"><b>Straßenhändler</b><small>${has('stall')?`Bis ${1+stallLv()} freie Bewohner verkaufen tagsüber Überschuss (Lager über 80 %, außer Nahrung) – wie auf dem Markt sinkt dabei der Preis. Heute: +${f1(I.tday===dayNo()?I.tg:0)} 💰${tr?` · Händler: ${tr}`:''}`:'Braucht einen 🏪 Händlerstand.'}</small></div>${tg('trade',I.trade)}</div>`;
+  h+=`<div class="item"><div class="ic">🛒</div><div class="tx"><b>Straßenhändler</b><small>${has('stall')?`Bis ${1+stallLv()} freie Bewohner verkaufen tagsüber Überschuss (Lager über 80 %, außer Nahrung) – wie auf dem Markt sinkt dabei der Preis. Heute: +${fmt(I.tday===dayNo()?I.tg:0)} / max. ${tradeDayCap()} 💰 pro Tag (mehr mit größerem Händlerstand)${tr?` · Händler: ${tr}`:''}`:'Braucht einen 🏪 Händlerstand.'}</small></div>${tg('trade',I.trade)}</div>`;
   const fc=festCost(),cd=(S.festCD||0)-S.gt;
   if(festOn())h+=`<div class="item" style="border:2px solid #e0a526"><div class="ic">🎉</div><div class="tx"><b>Dorffest läuft!</b><small>+40 % Freude · noch ${Math.ceil((S.fest-S.gt)/60)} Min.</small></div></div>`;
   else h+=`<div class="item"><div class="ic">🎉</div><div class="tx"><b>Dorffest</b><small>Ab 5 freien Bewohnern: 1 Tag lang +40 % Freude. ${cd>0?`Nächstes Fest in ${Math.ceil(cd/60)} Min.`:costHtml(fc)}</small></div><button class="sm" data-act="fest" ${cd<=0&&fr>=5&&canPay(fc)?'':'disabled'}>Feiern</button></div>`;
