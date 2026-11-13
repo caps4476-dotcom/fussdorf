@@ -1733,7 +1733,7 @@ function render(dt){
 }
 
 // ======================= EINGABE =======================
-const ptrs=new Map();let buildQ=[],multiSel=false,gm=null,GM_IGN=null,tapStart=null,pinch=null,sel=null,placing=null,demoMode=false,demoTarget=null,roadMode=null,pathGen=0;
+const ptrs=new Map();let buildQ=[],multiSel=false,serialMode=false,gm=null,GM_IGN=null,tapStart=null,pinch=null,sel=null,placing=null,demoMode=false,demoTarget=null,roadMode=null,pathGen=0;
 function clampCam(){const vw=innerWidth/cam.z,vh=innerHeight/cam.z;cam.x=Math.max(-vw/2,Math.min(W*T-vw/2,cam.x));cam.y=Math.max(-vh/2,Math.min(H*T-vh/2,cam.y))}
 function pinchStart(){const p=[...ptrs.values()];const d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y)||1,mx=(p[0].x+p[1].x)/2,my=(p[0].y+p[1].y)/2;pinch={d0:d,z0:cam.z,wx:cam.x+mx/cam.z,wy:cam.y+my/cam.z}}
 cv.addEventListener('pointerdown',e=>{
@@ -1782,6 +1782,13 @@ function onTap(sx,sy){
   const tx=Math.floor((cam.x+sx/cam.z)/T),ty=Math.floor((cam.y+sy/cam.z)/T);
   if(!inMap(tx,ty))return;
   if(gm){if(gm.st==='sel'){const b=buildingAt(tx,ty);if(b){if(B[b.type].fixed){toast('Das Lagerfeuer bleibt, wo es ist');return}const i=gm.ids.indexOf(b.id);if(i>=0)gm.ids.splice(i,1);else gm.ids.push(b.id)}}else{gm.x=tx;gm.y=ty}updateBanner();return}
+  if(placing&&placing.ser){const sp=placing.ser,i=sp.findIndex(q=>tx>=q.x&&tx<q.x+fpW(placing.type)&&ty>=q.y&&ty<q.y+fpH(placing.type));
+    if(i>=0)sp.splice(i,1);
+    else{const w=fpW(placing.type),h=fpH(placing.type),ov=sp.some(q=>tx<q.x+w&&tx+w>q.x&&ty<q.y+h&&ty+h>q.y);
+      if(ov||!validPlace(tx,ty)){toast('Hier kann nicht gebaut werden');return}
+      if(!canPay(serCost(sp.length+1))){toast('Für ein weiteres reichen die Ressourcen nicht');return}
+      sp.push({x:tx,y:ty})}
+    updateBanner();return}
   if(placing){placing.x=tx;placing.y=ty;updateBanner();return}
   if(roadMode){if(!roadMode.s){if(!S.zones[zoneOf(tx,ty)]){toast('Zone noch gesperrt');return}roadMode.s={x:tx,y:ty}}else{buildRoad(roadMode.s,{x:tx,y:ty});roadMode.s={x:tx,y:ty}}updateBanner();return}
   if(!demoMode&&S.trader){const c=S.buildings[0],wxp=(cam.x+sx/cam.z)/T,wyp=(cam.y+sy/cam.z)/T;if(Math.hypot(c.x+1.6-wxp,c.y+.5-wyp)<.6){sel=null;openSheet('trader');return}}
@@ -1839,7 +1846,7 @@ function renderSheet(){
 }
 function sheetBuild(){
   let h='<h3>🔨 Bauen</h3><div class="row" style="margin-bottom:8px"><button class="danger" data-act="roadmode" style="margin:0">🛣️ Wege bauen</button><button class="danger" data-act="demomode" style="margin:0">🗑️ Abriss-Modus</button></div><p class="desc" style="margin-bottom:8px">Wege: 1 🪨 pro Feld. Bewohner laufen darauf fast doppelt so schnell, Gebäude mit Weganschluss arbeiten +10 %. Der Abriss-Modus entfernt auch Wege, Bäume und Felsen.</p>';
-  h+=`<div class="row" style="margin-bottom:8px"><button class="sm" style="margin:0;${multiSel?'background:#4f8a2b':'background:#8a7a6a'}" data-act="msel">${multiSel?'☑️ Mehrfachauswahl AN':'☐ Mehrfachauswahl'}</button><button class="sm" style="margin:0" data-act="gmove">↔️ Mehrere verschieben</button></div>`;
+  h+=`<div class="row" style="margin-bottom:8px"><button class="sm" style="margin:0;${multiSel?'background:#4f8a2b':'background:#8a7a6a'}" data-act="msel">${multiSel?'☑️ Mehrfachauswahl AN':'☐ Mehrfachauswahl'}</button><button class="sm" style="margin:0" data-act="gmove">↔️ Mehrere verschieben</button></div><div class="row" style="margin:-2px 0 8px"><button class="sm" style="margin:0;${serialMode?'background:#4f8a2b':'background:#8a7a6a'}" data-act="sertog">${serialMode?'🔁 Serienbau AN – Gebäude antippen, dann beliebig viele Plätze markieren':'🔁 Serienbau: ein Gebäude mehrfach bauen'}</button></div>`;
   if(multiSel){const cnt={};for(const t of buildQ)cnt[t]=(cnt[t]||0)+1;const qc=qCost(),ok=canPay(qc);
     h+=`<div class="item" style="display:block;border:2px solid #4f8a2b;padding:8px 10px"><b>🧺 Auswahl: ${buildQ.length} Gebäude</b>${buildQ.length?`<small>${Object.keys(cnt).map(t=>`${B[t].i} ${B[t].n} ×${cnt[t]}`).join(' · ')}</small><div class="cost">Gesamt: ${costHtml(qc)}${ok?'':' <b style="color:#c0392b">– reicht nicht für alle</b>'}</div><div class="row" style="gap:5px;margin-top:6px"><button class="sm" data-act="qstart">▶️ Nacheinander platzieren</button><button class="sm" style="background:#8a7a6a" data-act="qclr">Leeren</button></div>`:'<small>Tippe unten Gebäude an – auch mehrmals dasselbe. Danach platzierst du sie nacheinander auf der Karte.</small>'}</div>`}
   for(const k in B){const d=B[k];if(d.fixed)continue;const lk=d.req&&!S.tech[d.req],qn=buildQ.filter(t=>t===k).length;
@@ -2150,9 +2157,14 @@ function updateUI(){
 }
 function gmLayout(){if(!gm||!gm.ids.length)return [];const bs=gm.ids.map(byId).filter(Boolean),mx=Math.min(...bs.map(b=>b.x)),my=Math.min(...bs.map(b=>b.y));return bs.map(b=>({b,nx:b.x-mx+gm.x,ny:b.y-my+gm.y}))}
 function gmValid(){if(!gm||gm.x==null)return false;GM_IGN=new Set(gm.ids);let ok=true;for(const {b,nx,ny} of gmLayout()){for(let y=ny;y<ny+fpH(b.type)&&ok;y++)for(let x=nx;x<nx+fpW(b.type);x++)if(!validTile(x,y)){ok=false;break}if(!ok)break}GM_IGN=null;return ok}
-function drawGroup(){if(!gm)return;
+function drawGroup(){
+  if(placing&&placing.ser){const d=B[placing.type],w=fpW(placing.type),h=fpH(placing.type);ctx.textAlign='center';ctx.textBaseline='middle';
+    placing.ser.forEach((q,i)=>{ctx.fillStyle='rgba(120,255,120,.5)';ctx.fillRect(q.x*T,q.y*T,w*T,h*T);ctx.strokeStyle='#2e7d32';ctx.lineWidth=2/cam.z;ctx.strokeRect(q.x*T+1,q.y*T+1,w*T-2,h*T-2);ctx.globalAlpha=.85;ctx.fillStyle='#000';ctx.font=`${T*.5}px sans-serif`;ctx.fillText(d.i,(q.x+w/2)*T,(q.y+h/2)*T);ctx.globalAlpha=1;
+      ctx.fillStyle='#2e7d32';ctx.beginPath();ctx.arc(q.x*T+6,q.y*T+6,6,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 8px sans-serif';ctx.fillText(i+1,q.x*T+6,q.y*T+6.5)})}
+  if(!gm)return;
   for(const id of gm.ids){const b=byId(id);if(!b)continue;ctx.strokeStyle='#ffd34d';ctx.lineWidth=3/cam.z;ctx.setLineDash([5/cam.z,3/cam.z]);ctx.strokeRect(b.x*T+1,b.y*T+1,fpW(b.type)*T-2,fpH(b.type)*T-2);ctx.setLineDash([]);ctx.fillStyle='rgba(255,211,77,.18)';ctx.fillRect(b.x*T,b.y*T,fpW(b.type)*T,fpH(b.type)*T)}
   if(gm.st==='place'&&gm.x!=null){const ok=gmValid();for(const {b,nx,ny} of gmLayout()){ctx.fillStyle=ok?'rgba(120,255,120,.5)':'rgba(255,80,80,.55)';ctx.fillRect(nx*T,ny*T,fpW(b.type)*T,fpH(b.type)*T);ctx.font=`${T*.5}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#000';ctx.globalAlpha=.85;ctx.fillText(B[b.type].i,(nx+fpW(b.type)/2)*T,(ny+fpH(b.type)/2)*T);ctx.globalAlpha=1}}}
+function serCost(n){const c={},d=B[placing.type];for(const r in d.cost)c[r]=d.cost[r]*n;return c}
 function qCost(){const c={};for(const t of buildQ)for(const r in B[t].cost)c[r]=(c[r]||0)+B[t].cost[r];return c}
 function updateBanner(){
   const bn=$('banner');
@@ -2171,6 +2183,7 @@ function updateBanner(){
     else{const ok=gmValid();$('bText').innerHTML=`↔️ <b>${gm.ids.length} Gebäude</b> – ${gm.x==null?'tippe auf das Ziel (obere linke Ecke der Gruppe)':ok?'Platz ist frei':'Hier passt die Gruppe nicht hin'}`;$('bOk').textContent='✔ Hierhin';$('bOk').disabled=!ok}
     bn.classList.add('on');return}
   if(!placing){bn.classList.remove('on');return}
+  if(placing.ser){const d=B[placing.type],n=placing.ser.length;$('bNo').textContent='✖';$('bText').innerHTML=`🔁 <b>Serienbau: ${d.i} ${d.n}</b> – ${n?`${n} markiert · ${costHtml(serCost(n))}`:'tippe beliebig viele Plätze an (nochmal tippen = entfernen)'}`;$('bOk').textContent=`✔ Alle bauen${n?' ('+n+')':''}`;$('bOk').disabled=!n;bn.classList.add('on');return}
   $('bOk').textContent=placing.move?'✔ Hierhin':'✔ Bauen';
   const d=B[placing.type];let t=`${placing.move?'↔️ ':''}${placing.q&&buildQ.length>1?`<b>(${placing.qi}/${placing.qn})</b> `:placing.q?`<b>(${placing.qi}/${placing.qn})</b> `:''}${d.i} <b>${d.n}</b> – `,ok=false;
   if(placing.x==null)t+=placing.move?'tippe auf das neue Feld':'tippe auf ein freies Feld';
@@ -2185,7 +2198,7 @@ function act(a,p){
   switch(a){
     case 'nav':gm=null;placing=null;demoMode=false;demoTarget=null;roadMode=null;updateBanner();sel=null;if(sheetKind===p)closeSheet();else openSheet(p);break;
     case 'close':closeSheet();sel=null;break;
-    case 'place':{roadMode=null;demoMode=false;const d=B[p];if(p==='bank'&&S.buildings.some(b=>b.type==='bank')){toast('Es gibt nur eine Bank – baue sie lieber aus');return}if(!canPay(d.cost)){toast('Nicht genug Ressourcen');return}placing={type:p,x:null,y:null};closeSheet();sel=null;updateBanner();break}
+    case 'place':{roadMode=null;demoMode=false;const d=B[p];if(p==='bank'&&S.buildings.some(b=>b.type==='bank')){toast('Es gibt nur eine Bank – baue sie lieber aus');return}if(!canPay(d.cost)){toast('Nicht genug Ressourcen');return}placing={type:p,x:null,y:null,ser:serialMode&&p!=='bank'?[]:null};closeSheet();sel=null;updateBanner();break}
     case 'cancel':buildQ=[];gm=null;placing=null;demoMode=false;demoTarget=null;roadMode=null;updateBanner();break;
     case 'roadmode':placing=null;demoMode=false;roadMode={s:null};closeSheet();sel=null;updateBanner();break;
     case 'clear':{if(demoConfirm!=='node'){demoConfirm='node';renderSheet();return}const i=sheetArg.x+sheetArg.y*W;doClear(i);demoConfirm=null;sel=null;closeSheet();break}
@@ -2194,6 +2207,10 @@ function act(a,p){
     case 'build':{
       if(gm){if(gm.st==='sel'){if(gm.ids.length){gm.st='place';gm.x=null}updateBanner();break}if(!gmValid())return;for(const {b,nx,ny} of gmLayout()){dirtyAround(b.x,b.y);b.x=nx;b.y=ny;dirtyAround(b.x,b.y)}toast(`↔️ ${gm.ids.length} Gebäude verschoben`);gm=null;updateBanner();save();break}
       if(demoMode){const d_=demoTarget;if(d_){if(d_.k==='b'){const b=byId(d_.id);if(b)doDemolish(b)}else if(d_.k==='road')removeRoad(d_.i);else doClear(d_.i)}demoTarget=null;updateBanner();break}
+      if(placing&&placing.ser){const d=B[placing.type],sp=placing.ser.slice();let n=0;
+        for(const q of sp){if(!validPlace(q.x,q.y)||!canPay(d.cost))continue;pay(d.cost);const bt=buildTime(d.cost);const b={id:S.nid++,type:placing.type,x:q.x,y:q.y,level:1,t:Date.now(),cs:bt,ct:bt,qs:Date.now(),pc:Object.assign({},d.cost)};S.buildings.push(b);dirtyAround(b.x,b.y);n++}
+        placing=null;updateBanner();if(S.hero&&S.hero.cmd!=='inv'){heroFree();S.hero.cmd='auto'}
+        toast(n?`🚧 ${n} Baustelle${n>1?'n':''} ${d.i} ${d.n} angelegt${n<sp.length?` (${sp.length-n} nicht möglich)`:''} – Bauhelfer packen mit an!`:'Nichts gebaut');save();break}
       if(!placing||placing.x==null)return;
       const d=B[placing.type];
       if(!validPlace(placing.x,placing.y))return;
@@ -2273,7 +2290,8 @@ function act(a,p){
     case 'rtog':{const rt=S.routes[+p];if(rt){rt.on=!rt.on;renderSheet();save()}break}
     case 'rn':{const [i,dn]=p.split(':');const rt=S.routes[+i];if(rt){rt.n=Math.max(10,Math.min(routeCap(),Math.min(rt.n,routeCap())+ +dn));renderSheet();save()}break}
     case 'rquiet':S.routeQuiet=!S.routeQuiet;renderSheet();break;
-    case 'msel':multiSel=!multiSel;if(!multiSel)buildQ=[];renderSheet();break;
+    case 'sertog':serialMode=!serialMode;if(serialMode&&multiSel){multiSel=false;buildQ=[]}renderSheet();break;
+    case 'msel':multiSel=!multiSel;if(multiSel)serialMode=false;if(!multiSel)buildQ=[];renderSheet();break;
     case 'qadd':{buildQ.push(p);renderSheet();break}
     case 'qrem':{const i=buildQ.lastIndexOf(p);if(i>=0)buildQ.splice(i,1);renderSheet();break}
     case 'qclr':buildQ=[];renderSheet();break;
