@@ -506,11 +506,11 @@ function exploreLoot(v,live){
 // ======================= EPOCHEN =======================
 const EPOCHS=[
  {n:'Mittelalter',i:'🏰',desc:'Holz, Stein und Handwerk – hier hat alles begonnen.'},
- {n:'Industriezeit',i:'🏭',desc:'Kohle, Dampf und Fabriken verändern das Dorf.',req:{pop:50,tech:['smelting','smithing','tools2'],res:{planks:400,stone:400,iron:150,tools:40,gold:1500}},
+ {n:'Industriezeit',i:'🏭',desc:'Kohle, Dampf und Fabriken verändern das Dorf.',req:{pop:200,tech:['smelting','smithing','tools2'],res:{planks:400,stone:400,iron:150,tools:40,gold:1500}},
   story:'Rauch steigt aus neuen Schornsteinen, und das Klirren der Hämmer hallt durch die gepflasterten Gassen. Ein Ingenieur aus der Hauptstadt bringt Pläne für Zechen, Fabriken und sogar eine Eisenbahn mit. Siedlertal ist kein verschlafenes Dorf mehr – die Industriezeit beginnt!'},
- {n:'Moderne',i:'🏙️',desc:'Strom, Asphalt, Wohnblocks, Kino und Supermarkt.',req:{pop:100,tech:['industry','steam','university'],res:{planks:800,iron:400,tools:120,coal:300,gold:4000}},
+ {n:'Moderne',i:'🏙️',desc:'Strom, Asphalt, Wohnblocks, Kino und Supermarkt.',req:{pop:400,tech:['industry','steam','university'],res:{planks:800,iron:400,tools:120,coal:300,gold:4000}},
   story:'Die Straßen bekommen Asphalt, in jedem Fenster brennt elektrisches Licht. Auf dem Marktplatz wird über Wohnblocks, ein Kino und einen Supermarkt gestritten – und am Ende gebaut. Aus dem Dorf ist eine kleine Stadt geworden: Willkommen in der Moderne!'},
- {n:'Zukunft',i:'🚀',desc:'Sonnenstrom, Roboter und Gemüse aus Hochhäusern.',req:{pop:150,tech:['masshousing','media','retail'],res:{iron:800,tools:300,coal:500,gold:10000,diamond:10}},
+ {n:'Zukunft',i:'🚀',desc:'Sonnenstrom, Roboter und Gemüse aus Hochhäusern.',req:{pop:700,tech:['masshousing','media','retail'],res:{iron:800,tools:300,coal:500,gold:10000,diamond:10}},
   story:'Solarpaneele glitzern auf den Dächern, leise surrende Roboter helfen in den Werkstätten, und mitten in der Stadt wächst Gemüse in gläsernen Türmen. Die Bewohner blicken stolz zurück auf die erste Hütte am Lagerfeuer – und nach vorn in die Zukunft.'}];
 const EP=()=>S.epoch||0;
 function epochCheck(){const e=EPOCHS[EP()+1];if(!e)return null;const q=e.req,it=[];
