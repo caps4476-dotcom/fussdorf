@@ -333,7 +333,7 @@ const NAMES_F=['Anna','Clara','Emma','Greta','Ida','Klara','Mia','Olga','Rosa','
 const NAMES_M=['Ben','David','Felix','Hans','Jakob','Lukas','Noah','Paul','Simon','Udo','Willi','Moritz','Karl','Oskar','Emil','Fritz','Anton','Bruno','Theo','Gustav','Max','Leo','Otto','Jonas'];
 const NAMES=NAMES_F.concat(NAMES_M);
 const GROW=3*720;
-let PWR=0,PWR_S=0,PWR_D=0,VEH=false,ROBO=0;
+let PWR=0,PWR_S=0,PWR_D=0,VEH=false,ROBO=0,VSC=1;
 const TRAITS=['fleißig','verträumt','gesellig','mutig','gemütlich','neugierig','fröhlich','schüchtern'];
 const WORKTALK={woodcutter:'Holz! 🪓',quarry:'Stein um Stein ⛏️',gatherer:'Beeren! 🫐',scholar:'Hmm, interessant… 📜',sawmill:'Sägen, sägen 🪚',farm:'Das Korn wächst 🌾',mine:'Glück auf! ⛏️',smelter:'Heiß hier! 🔥',fisher:'Beißt einer an? 🎣',mill:'Die Flügel drehen sich 🌬️',bakery:'Frisches Brot! 🥖',toolsmith:'Klong, klong ⚒️'};
 const LIGHTS={power:1.5,school:1.2,uni:1.3,tavern:1.4,monument:1.8,camp:2.2,house:1.3,bakery:1.3,smelter:1.4,toolsmith:1.3,market:1.5,scholar:1.2,fountain:1};
@@ -787,7 +787,18 @@ const slots=b=>B[b.type].slots?B[b.type].slots+(b.level-1):0;
 function countNear(x,y,t,r){let n=0;for(let yy=y-r;yy<=y+r;yy++)for(let xx=x-r;xx<=x+r;xx++){if(inMap(xx,yy)&&S.tiles[xx+yy*W]===t&&Math.hypot(xx-x,yy-y)<=r+.5)n++}return n}
 function effAt(type,x,y){const d=B[type];if(d.near==null)return 1;const n=countNear(x,y,d.near,d.r);return n===0?0:Math.min(1,.4+n*.15)}
 const eff=b=>effAt(b.type,b.x,b.y);
-function mult(b,r){let m=1+.5*(b.level-1);if(S.tech.tools1&&(r==='wood'||r==='stone'))m*=1.2;if(S.tech.tools2)m*=1.3;if(S.tech.tools3)m*=1.25;if(S.tech.diamondtools)m*=1.2;if(S.tech.gemcraft2){if(r==='diamond')m*=1.5;if(r==='stone'||r==='ore')m*=1.15}if(hasRoad(b))m*=1.1;if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))m*=1+.25*PWR;if(S.story&&S.story.bless)m*=1.15;const hc=S.hero&&S.hero.c;if(hc==='thordis'&&r==='wood')m*=1.1;if(hc==='elmiran'&&r==='food')m*=1.15;if(hc==='zara'&&r==='research')m*=1.25;if(S.tech.agri2&&(r==='food'||r==='grain'))m*=1.25;if(S.tech.mining2&&(r==='stone'||r==='ore'))m*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))m*=1.15;m*=1+.1*(S.epoch||0);m*=1+ROBO;if(inDist(b))m*=1.15;m*=bioMult(b);m*=.8+.4*happy().total;if(B[b.type].season&&(r==='food'||r==='grain'))m*=SEAS[seasonIdx()].food;return m}
+function multParts(b,r){const P=[],add=(i,n,f)=>{if(Math.abs(f-1)>.001)P.push([i,n,f])},T_=S.tech,hc=S.hero&&S.hero.c;
+  add('🏗️','Ausbaustufe '+b.level,1+.5*(b.level-1));
+  let t=1;if(T_.tools1&&(r==='wood'||r==='stone'))t*=1.2;if(T_.tools2)t*=1.3;if(T_.tools3)t*=1.25;if(T_.diamondtools)t*=1.2;if(T_.gemcraft2){if(r==='diamond')t*=1.5;if(r==='stone'||r==='ore')t*=1.15}if(T_.agri2&&(r==='food'||r==='grain'))t*=1.25;if(T_.mining2&&(r==='stone'||r==='ore'))t*=1.25;add('🔬','Forschung & Werkzeuge',t);
+  if(hasRoad(b))add('🛤️','Straßenanschluss',1.1);
+  if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))add('⚡','Strom',1+.25*PWR);
+  add('🤖','Roboter',1+ROBO);add('🕰️','Epoche',1+.1*(S.epoch||0));
+  if(inDist(b))add('🏘️','Passender Bezirk',1.15);add('🗺️','Landschaft',bioMult(b));
+  let h=1;if(S.story&&S.story.bless)h*=1.15;if(hc==='thordis'&&r==='wood')h*=1.1;if(hc==='elmiran'&&r==='food')h*=1.15;if(hc==='zara'&&r==='research')h*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))h*=1.15;add('🦸','Held & Segen',h);
+  add('😊','Zufriedenheit',.8+.4*happy().total);
+  if(B[b.type].season&&(r==='food'||r==='grain'))add(SEAS[seasonIdx()].i,'Jahreszeit',SEAS[seasonIdx()].food);
+  return P}
+function mult(b,r){let m=1;for(const p of multParts(b,r))m*=p[2];return m}
 const hasRoad=b=>{const w=fpW(b.type),h=fpH(b.type);for(let y=b.y-1;y<=b.y+h;y++)for(let x=b.x-1;x<=b.x+w;x++){const ins=x>=b.x&&x<b.x+w&&y>=b.y&&y<b.y+h,cor=(x<b.x||x>=b.x+w)&&(y<b.y||y>=b.y+h);if(ins||cor||!inMap(x,y))continue;if(S.road[x+y*W])return true}return false};
 function cap(r){if(r==='research'||r==='gold'||r==='diamond')return Infinity;if(r==='trash'){let c=50;for(const b of S.buildings)if(b.type==='dump'&&!isSite(b))c+=DUMP_CAP*b.level;return c}let c=100;for(const b of S.buildings)if(B[b.type].cap&&!isSite(b))c+=B[b.type].cap*b.level;return c}
 function popCap(){let c=0;for(const b of S.buildings)c+=beds(b);return c}
@@ -1276,9 +1287,9 @@ function updV(v,dt){
     if(v.asleep){v.asleep=false;v.tx=null;v.wait=Math.random()*2}
     if(v.wait>0){v.wait-=dt;return}
     if(v.tx==null&&v.role==='s'){const hs=S.buildings.filter(b=>b.type==='house'&&!isSite(b));if(hs.length){const b=hs[Math.floor(Math.random()*hs.length)];v.tx=Math.max(.3,Math.min(W-.3,b.x+.5+(Math.random()-.5)*1.6));v.ty=Math.max(.3,Math.min(H-.3,b.y+1.15))}}
-    if(v.tx==null&&!v.kid&&(v.role==='t'||festOn())){const st=v.role==='t'?S.buildings.find(b=>b.type==='stall'&&!isSite(b)):S.buildings[0];if(st){v.tx=Math.max(.3,Math.min(W-.3,st.x+.5+(Math.random()-.5)*2.6));v.ty=Math.max(.3,Math.min(H-.3,st.y+.5+(Math.random()-.5)*2.6))}}
-    if(v.tx==null&&fairOn()&&!v.kid&&Math.random()<.6){const f=S.fair;v.tx=f.x+.3+Math.random()*(f.s-.6);v.ty=f.y+.3+Math.random()*(f.s-.6)}
-    if(v.tx==null&&(seasonIdx()===3||seasonIdx()===1)&&Math.random()<.5){const ws=S.buildings.filter(b=>B[b.type].wjoy&&!isSite(b));if(ws.length){const st=ws[Math.floor(Math.random()*ws.length)];v.tx=Math.max(.3,Math.min(W-.3,st.x+.5+(Math.random()-.5)*1.8));v.ty=Math.max(.3,Math.min(H-.3,st.y+1.2))}}
+    if(v.tx==null&&!v.kid&&(v.role==='t'||festOn())){const st=v.role==='t'?S.buildings.find(b=>b.type==='stall'&&!isSite(b)):S.buildings[0],sp=v.role==='t'?2.6:7;if(st){v.tx=Math.max(.3,Math.min(W-.3,st.x+.5+(Math.random()-.5)*sp));v.ty=Math.max(.3,Math.min(H-.3,st.y+.5+(Math.random()-.5)*sp))}}
+    if(v.tx==null&&fairOn()&&!v.kid&&Math.random()<.25){const f=S.fair;v.tx=f.x+.3+Math.random()*(f.s-.6);v.ty=f.y+.3+Math.random()*(f.s-.6)}
+    if(v.tx==null&&(seasonIdx()===3||seasonIdx()===1)&&Math.random()<.2){const ws=S.buildings.filter(b=>B[b.type].wjoy&&!isSite(b));if(ws.length){const st=ws[Math.floor(Math.random()*ws.length)];v.tx=Math.max(.3,Math.min(W-.3,st.x+.5+(Math.random()-.5)*1.8));v.ty=Math.max(.3,Math.min(H-.3,st.y+1.2))}}
     if(v.tx==null){const sc=v.kid&&v.seat&&S.buildings.find(b=>b.type==='school'&&!isSite(b)),hs=S.buildings.filter(b=>B[b.type].house&&!isSite(b)),hp=v.home&&byId(v.home),h=sc||(hp&&B[hp.type].house?hp:hs[Math.floor(Math.random()*hs.length)]);v.tx=Math.max(.3,Math.min(W-.3,h.x+.5+(Math.random()-.5)*3));v.ty=Math.max(.3,Math.min(H-.3,h.y+.5+(Math.random()-.5)*3))}
     if(walk(v,v.tx,v.ty,dt,SPEED*.5)){v.tx=null;v.wait=1+Math.random()*3}
     return;
@@ -1572,8 +1583,7 @@ function drawBuilding(b,cnt){
 }
 function drawV(v){
   const px=v.x*T,py=v.y*T+(v.working?Math.sin(v.anim*12)*1.2:0);
-  if(v.kid){ctx.save();ctx.translate(px,py);ctx.scale(.65,.65);ctx.translate(-px,-py);drawV2(v,px,py);ctx.restore();return}
-  drawV2(v,px,py);
+  const sc=VSC*(v.kid?.65:1);if(sc!==1){ctx.save();ctx.translate(px,py);ctx.scale(sc,sc);ctx.translate(-px,-py);drawV2(v,px,py);ctx.restore()}else drawV2(v,px,py);if(v.kid)return;
   if(v.sick>0){ctx.font='7px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#000';ctx.fillText('🤒',px+4,py-6)}
 }
 function drawV2(v,px,py){
@@ -1715,7 +1725,10 @@ function render(dt){
   drawFires();
   drawGroup();
   const vs=S.vill.filter(v=>vis(v.x,v.y)).sort((a,b)=>a.y-b.y);
-  for(const v of vs)if(!v.asleep&&!v.inH&&!(v.job&&v.job.t==='x'))drawV(v);
+  {const pop=S.vill.length;VSC=pop>200?.72:pop>120?.82:pop>60?.9:1;const idl=pop>60?vs.filter(v=>!v.job&&!v.asleep).length:0,k=Math.max(1,Math.ceil(idl/28)),rot=Math.floor(S.gt/45);
+   for(const v of vs){if(v.asleep||v.inH||(v.job&&v.job.t==='x'))continue;
+     if(!v.job&&!v.sick){if(inFair(Math.floor(v.x),Math.floor(v.y)))continue;const bb=buildingAt(Math.floor(v.x),Math.floor(v.y));if(bb&&B[bb.type].wjoy)continue;if(k>1&&!v.role&&((v.id*7+rot)%k))continue}
+     drawV(v)}}
   drawHero();
   if(S.trader){const c=S.buildings[0],tx=(c.x+1.6)*T,ty=(c.y+.5)*T,bo=Math.sin(performance.now()/300)*1.5;ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(tx+2,ty+5,8,4,0,0,7);ctx.fill();ctx.fillStyle='#e8c070';ctx.beginPath();ctx.arc(tx,ty,8,0,7);ctx.fill();ctx.strokeStyle='#7a5a10';ctx.stroke();ctx.font='13px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('🧳',tx,ty+.5);ctx.font='10px sans-serif';ctx.fillText('💰',tx+8,ty-10+bo)}
   for(const p of smoke){ctx.fillStyle=`rgba(${curSi===3?'235,240,245':'200,200,200'},${(1-p.a/2.5)*.4})`;ctx.beginPath();ctx.arc(p.x*T,p.y*T,2+p.a*2.5,0,7);ctx.fill()}
@@ -1917,12 +1930,12 @@ function sheetV(v){
 function sheetVillage(){
   const pop=S.vill.length,pc=popCap(),idle=idleV().length,g=S.vill.filter(v=>v.job&&v.job.t==='g').length,w=pop-idle-g;
   const fr=econ(60,false).food||0;
-  let h=`<h3>👥 Dorf</h3><p>Erwachsene: <b>${adults()}</b> / ${pc} Wohnplätze${pop>adults()?` · Kinder: <b>${pop-adults()}</b> (schlafen bei den Eltern)`:''}</p><p>😴 Frei: <b>${idle}</b> · 👷 In Gebäuden: <b>${w}</b> · 🧺 Sammler: <b>${g}</b></p>`;
+  const vt=VT;let h=`<h3>👥 Dorf</h3>${vTabs()}`;if(vt==='ov')h+=`<p>Erwachsene: <b>${adults()}</b> / ${pc} Wohnplätze${pop>adults()?` · Kinder: <b>${pop-adults()}</b> (schlafen bei den Eltern)`:''}</p><p>😴 Frei: <b>${idle}</b> · 👷 In Gebäuden: <b>${w}</b> · 🧺 Sammler: <b>${g}</b></p>`;
   const ns=S.vill.filter(v=>v.kid).length,pr=S.vill.filter(v=>v.partner&&!v.kid).length/2;
-  h+=`<p>💕 Paare: <b>${Math.floor(pr)}</b> · 🧒 Kinder: <b>${ns}</b> · 🎒 Gebildet: <b>${S.vill.filter(v=>v.edu===1).length}</b> · 🎓 Gelehrte: <b>${eduCount()}</b></p>`;
-  h+=`<p>🍎 Nahrung: <b class="${fr<0?'miss':''}">${fr>=0?'+':'−'}${f1(fr)}/Min</b> (jeder Bewohner isst ${f1(FOOD_PER*60)}/Min)</p>`;
-  const hl=homeless();if(hl>0)h+=`<p class="miss">🏚️ ${hl} Bewohner ohne Wohnung! ${S.selfBuild!==false?(canPay(B.house.cost)?'Die Bewohner bauen sich selbst Häuser.':'Für Selbstbau fehlen 12 🪵 / 4 🪨 – sonst ziehen sie nach und nach weg.'):'Sie ziehen nach und nach weg.'}</p>`;
-  {const J=joyCalc(),ad=Math.max(1,adults()),hos=S.buildings.filter(b=>b.type==='hospital'&&!isSite(b)).reduce((a,b)=>a+hospBeds(b),0),kids=S.vill.filter(v=>v.kid).length,seats=S.buildings.filter(b=>b.type==='school'&&!isSite(b)).reduce((a,b)=>a+6*b.level,0),
+  if(vt==='pe')h+=`<p>💕 Paare: <b>${Math.floor(pr)}</b> · 🧒 Kinder: <b>${ns}</b> · 🎒 Gebildet: <b>${S.vill.filter(v=>v.edu===1).length}</b> · 🎓 Gelehrte: <b>${eduCount()}</b></p>`;
+  if(vt==='ov')h+=`<p>🍎 Nahrung: <b class="${fr<0?'miss':''}">${fr>=0?'+':'−'}${f1(fr)}/Min</b> (jeder Bewohner isst ${f1(FOOD_PER*60)}/Min)</p>`;
+  const hl=homeless();if(hl>0&&(vt==='ov'||vt==='pe'))h+=`<p class="miss">🏚️ ${hl} Bewohner ohne Wohnung! ${S.selfBuild!==false?(canPay(B.house.cost)?'Die Bewohner bauen sich selbst Häuser.':'Für Selbstbau fehlen 12 🪵 / 4 🪨 – sonst ziehen sie nach und nach weg.'):'Sie ziehen nach und nach weg.'}</p>`;
+  if(vt==='ov'){const J=joyCalc(),ad=Math.max(1,adults()),hos=S.buildings.filter(b=>b.type==='hospital'&&!isSite(b)).reduce((a,b)=>a+hospBeds(b),0),kids=S.vill.filter(v=>v.kid).length,seats=S.buildings.filter(b=>b.type==='school'&&!isSite(b)).reduce((a,b)=>a+6*b.level,0),
      slotsT=S.buildings.filter(b=>!isSite(b)&&B[b.type].slots).reduce((a,b)=>a+slots(b),0),gen=trashGen(),col=TR_COL+TR_SW;
    const row=(i,n,v,txt)=>`<div style="margin-top:6px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${i} ${n}</span><b style="color:${v>=.9?'#2e7d32':v>=.6?'#c9a227':'#c0392b'}">${txt}</b></div><div style="height:7px;background:#e6dccb;border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round(Math.min(1,v)*100)}%;background:${v>=.9?'#4f8a2b':v>=.6?'#d4ac0d':'#c0392b'}"></div></div></div>`;
    h+=`<div class="item" style="display:block;padding:8px 10px"><b>📊 Versorgung</b>`;
@@ -1937,39 +1950,44 @@ function sheetVillage(){
    {const prod=S.buildings.filter(b=>!isSite(b)&&distOf(b.type)),inn=prod.filter(inDist).length,ds=distStats();if(prod.length)h+=row('🏘️','Im passenden Bezirk',inn/prod.length,`${inn} / ${prod.length} Gebäude`);if(ds.hs)h+=row('🔇','Ruhige Wohnlage',1-ds.loud,`${Math.round((1-ds.loud)*100)} % der Häuser`)}
    h+=row('👷','Arbeitsplätze',slotsT/ad,`${slotsT} Plätze / ${ad} Erw.`);
    h+=`</div>`}
-  h+=`<div class="item" data-act="nav:epoch" style="display:block;padding:7px 10px"><b>🕰️ Epoche: ${EPOCHS[EP()].i} ${EPOCHS[EP()].n}</b>${epochCheck()?`<small>Nächste: ${EPOCHS[EP()+1].i} ${EPOCHS[EP()+1].n}${epochCheck().ok?' – <b style="color:#4f8a2b">bereit!</b>':''} · antippen für Details</small>`:''}</div>`;
-  h+=goldStat();
-  {const dl=dirtLvl(),gen=trashGen()*60,col=(TR_COL+TR_SW)*60;
+  if(vt==='ov')h+=`<div class="item" data-act="nav:epoch" style="display:block;padding:7px 10px"><b>🕰️ Epoche: ${EPOCHS[EP()].i} ${EPOCHS[EP()].n}</b>${epochCheck()?`<small>Nächste: ${EPOCHS[EP()+1].i} ${EPOCHS[EP()+1].n}${epochCheck().ok?' – <b style="color:#4f8a2b">bereit!</b>':''} · antippen für Details</small>`:''}</div>`;
+  if(vt==='fi')h+=goldStat();
+  if(vt==='um'){const dl=dirtLvl(),gen=trashGen()*60,col=(TR_COL+TR_SW)*60;
    h+=`<div class="item" style="display:block;padding:8px 10px"><b>🗑️ Sauberkeit: ${Math.round((1-dl)*100)} %</b>${bar('Sauberkeit',1-dl)}
    <small>Es entsteht ${f1(gen)} Müll/Min. · eingesammelt bis ${f1(col)}/Min. (Müllmänner ${f1(TR_COL*60)}, Straßenfeger ${f1(TR_SW*60)}) · herumliegend: ${fmt(S.dirt||0)}<br>
    Müllhalde: ${fmt(S.res.trash)}/${fmt(cap('trash'))} · verrottet ${f1(TR_ROT*60)}/Min.<br>Zufriedenheit: −${Math.round(dl*25)} %. ${S.res.trash>=cap('trash')-1?'⚠️ Müllhalde voll – Müllplatz ausbauen oder weiteren bauen! ':''}${!has('dump')&&gen>0?'Baue einen 🚛 Müllplatz!':S.tech.incinerate?'🔥 Das Kraftwerk verbrennt den gesammelten Müll.':S.tech.electricity?'Tipp: Mit 🔥 Müllverbrennung wird Müll zu Strom.':''}</small></div>`}
-  {const n=sickN(),hos=S.buildings.filter(b=>b.type==='hospital'&&!isSite(b)),beds=hos.reduce((a,b)=>a+hospBeds(b),0),inH=S.vill.filter(v=>v.sick>0&&v.hosp).length,care=S.buildings.filter(b=>b.type==='herbs'&&!isSite(b)).reduce((a,b)=>a+wcount(b)*b.level,0),rk=sickRisk()*60*Math.max(1,adults());
+  if(vt==='um'){const n=sickN(),hos=S.buildings.filter(b=>b.type==='hospital'&&!isSite(b)),beds=hos.reduce((a,b)=>a+hospBeds(b),0),inH=S.vill.filter(v=>v.sick>0&&v.hosp).length,care=S.buildings.filter(b=>b.type==='herbs'&&!isSite(b)).reduce((a,b)=>a+wcount(b)*b.level,0),rk=sickRisk()*60*Math.max(1,adults());
    h+=`<div class="item" style="display:block;padding:8px 10px"><b>🏥 Gesundheit: ${n?`${n} krank 🤒`:'alle gesund 😊'}</b>
    <small>Neue Erkrankungen: ca. ${f1(rk)} pro Min. – mehr bei Müll, Hunger und im Winter; Fleisch stärkt die Abwehr.<br>
    ${hos.length?`Krankenhaus: ${inH}/${beds} Betten belegt${beds?'':' – ⚠️ keine Ärzte!'}`:S.tech.medicine?'Baue ein 🏥 Krankenhaus für schnelle Heilung.':'Mit 💊 Medizin kannst du ein Krankenhaus bauen.'}${care?` · 🌿 Kräuterpflege: Stärke ${care}`:S.tech.herbs?' · Eine 🌿 Kräuterhütte pflegt Kranke zu Hause.':''}<br>
    Kranke arbeiten nicht und senken die Zufriedenheit${n?` (−${Math.round(40*n/Math.max(1,adults()))} %)`:''}.</small></div>`}
-  h+=sheetPop();
+  if(vt==='pe'){h+=sheetPop();
   h+=sheetIdle();
   h+=`<button class="danger" data-act="selfb">🏠 Selbstbau von Häusern: <b>${S.selfBuild!==false?'AN':'AUS'}</b></button>`;
   if(adults()>=pc)h+='<p class="note">Das Dorf ist voll – baue Häuser für neue Bewohner.</p>';
   else if(S.res.food<5)h+='<p class="note">Neue Bewohner kommen nur, wenn genug Nahrung (5+) da ist.</p>';
   else h+=`<p class="desc">Nächster Bewohner in ca. ${Math.ceil(SPAWN_T-S.spawnT)} s.</p>`;
+  }
   const Hp=happy(),SE=SEAS[seasonIdx()];
+  if(vt==='ov'){
   h+=`<p id="moodl" style="margin-top:10px"><b>${moodI(Hp.total)} Zufriedenheit ${Math.round(Hp.total*100)} %</b> → Produktion ×${f1(.8+.4*Hp.total)}</p>`;
   h+=bar('🍎 Nahrung',Hp.food)+bar('🏠 Wohnen',Hp.home)+bar('🎉 Freude',Hp.joy);
-  h+=`<div class="item" style="display:block;padding:9px 10px;margin-top:8px"><b>💰 Steuern</b><div id="taxinfo">${taxInfo()}</div>
+  }
+  if(vt==='fi')  h+=`<div class="item" style="display:block;padding:9px 10px;margin-top:8px"><b>💰 Steuern</b><div id="taxinfo">${taxInfo()}</div>
    <input type="range" id="taxr" min="0" max="${TAX_MAX}" step="0.1" value="${taxRate()}" style="width:100%;margin:8px 0 2px;accent-color:#e0a526">
    <div style="display:flex;justify-content:space-between;font-size:12px;opacity:.75"><span>0 · keine</span><span>2,5</span><span>${TAX_MAX} · maximal</span></div>
    <p class="desc">Gold pro Erwachsenem und Tag (Gebildete 1,5×, Gelehrte 2×). Unter 1 Gold freuen sich die Bewohner, darüber steigt der Unmut immer schneller. Fällt die Zufriedenheit unter ${Math.round(LEAVE_AT*100)} %, ziehen nach und nach Bewohner weg.</p></div>`;
-  h+='<p class="desc">Wohnen steigt mit höheren Hausstufen, Freude mit Blumenbeeten, Brunnen und Marktplätzen.</p>';
+  if(vt==='ov')h+='<p class="desc">Wohnen steigt mit höheren Hausstufen, Freude mit Blumenbeeten, Brunnen und Marktplätzen.</p>';
   const nx=SEAS[(seasonIdx()+1)%4];
-  h+=`<p>${SE.i} ${SE.n}, Tag ${dayNo()} – Nahrung aus Feldern, Sammeln & Fischen ×${f1(SE.food)}</p><p class="desc">${nx.i} ${nx.n} beginnt in ca. ${Math.ceil(seasonLeft()/60)} Min.${nx.n==='Winter'?' – denk an Vorräte und Lagerplatz!':''}</p>`;
-  if(g)h+='<button class="danger" data-act="recall">🔙 Alle Sammler zurückrufen</button>';
-  h+='<p style="margin-top:12px"><b>Bewohner</b></p>';
+  if(vt==='ov')h+=`<p>${SE.i} ${SE.n}, Tag ${dayNo()} – Nahrung aus Feldern, Sammeln & Fischen ×${f1(SE.food)}</p><p class="desc">${nx.i} ${nx.n} beginnt in ca. ${Math.ceil(seasonLeft()/60)} Min.${nx.n==='Winter'?' – denk an Vorräte und Lagerplatz!':''}</p>`;
+  if(g&&vt==='pe')h+='<button class="danger" data-act="recall">🔙 Alle Sammler zurückrufen</button>';
+  if(vt==='pe'){h+='<p style="margin-top:12px"><b>Bewohner</b></p>';
   for(const v of S.vill)h+=`<div class="item" data-act="openv:${v.id}"><div class="ic" style="font-size:22px">${moodI(Math.max(0,Math.min(1,Hp.total+v.mo)))}</div><div class="tx"><b>${v.name}</b><small>${jobText(v)}</small></div></div>`;
-  h+='<p style="margin-top:12px"><b>Gebäude</b></p>';
+  }
+  if(vt==='ge'){h+='<p style="margin-top:12px"><b>Gebäude</b></p>';
   const cnt=workerCounts();
   for(const b of S.buildings){const d=B[b.type];h+=`<div class="item" data-act="openb:${b.id}"><div class="ic">${d.i}</div><div class="tx"><b>${d.n}</b> <span class="lv">St. ${b.level}</span><small>${d.slots?'👷 '+(cnt[b.id]||0)+'/'+slots(b):d.house?'🛏️ '+beds(b)+' Plätze':d.joy?'🎉 +'+d.joy*b.level+' Freude':''}</small></div></div>`}
+  }
   return h;
 }
 function goldStat(){const g=S.gs||{},ks=Object.keys(g).sort((a,b)=>g[b]-g[a]),tot=ks.reduce((a,k)=>a+g[k],0);
@@ -1983,7 +2001,8 @@ function taxInfo(){
    <p style="margin:2px 0">Wirkung auf Zufriedenheit: <b style="color:${pen>0?'#c0392b':'#2e7d32'}">${pen>0?'−':'+'}${Math.round(Math.abs(pen)*100)} %</b></p>
    <p style="margin:2px 0;color:${st[2]}"><b>${st[0]} ${Math.round(t*100)} % – ${st[1]}</b></p>${S.left?`<p class="desc">Bisher weggezogen: ${S.left}</p>`:''}`;
 }
-let taxDrag=false;
+let taxDrag=false,VT='ov',MDET=false;
+function vTabs(){const T_=[['ov','📊 Übersicht'],['pe','👥 Bewohner'],['fi','💰 Finanzen'],['um','🏥 Umwelt'],['ge','🏠 Gebäude']];return `<div class="row" style="gap:4px;flex-wrap:wrap;margin:4px 0 10px">${T_.map(([k,n])=>`<button class="sm" style="margin:0;flex:1;padding:6px 4px;font-size:12.5px;${VT===k?'background:#e0a526;color:#3a2c1a':'background:#8a7a6a'}" data-act="vtab:${k}">${n}</button>`).join('')}</div>`}
 const popFull=()=>S.popMax!=null&&S.vill.length>=S.popMax;
 function popInfo(){const m=S.popMax;return m==null?`<b>Unbegrenzt</b> – neue Bewohner ziehen ein, bis alle ${popCap()} Wohnplätze belegt sind.`:`Höchstens <b>${m}</b> Einwohner (inkl. Kinder) · aktuell ${S.vill.length}${S.vill.length>=m?' – <b style="color:#c0392b">kein Zuzug, keine Geburten</b>':''}`}
 function popSliderMax(){return Math.max(10,popCap(),S.vill.length)+1}
@@ -2113,7 +2132,8 @@ function sheetBuilding(b){
   if(d.joy&&!SEATS[b.type])h+=`<p>🎉 Freude: <b>+${joyOf(d)*b.level}</b>${d.sj?` · jetzt: <b>${d.sn[seasonIdx()]}</b><br><small>${['🌸','☀️','🍂','❄️'].map((x,i)=>x+' +'+d.sj[i]*b.level).join(' · ')}</small>`:''}</p>`;
   if(d.store)h+=`<p>📥 Abgabestelle für Sammler</p>`;
   if(b.type==='tradepost'&&!isSite(b)){const on=(S.routes||[]).filter(r=>r.on).length;h+=`<p>🐴 ${(S.routes||[]).length}/${routeMax()} Routen · ${on} aktiv · Ladung bis ${routeCap()}</p><button class="big" data-act="nav:routes">🐴 Handelsrouten verwalten</button>`}
-  {const bv=bioMult(b);if(bv!==1)h+=`<p>🗺️ Landschaft ${THEME_N[biomeAt(b.x,b.y)]}: <b style="color:${bv>1?'#2e7d32':'#c0392b'}">${bv>1?'+':''}${Math.round((bv-1)*100)} %</b></p>`}
+  if((d.prod||d.conv)&&!isSite(b)){const r0=d.prod?Object.keys(d.prod)[0]:Object.keys(d.conv.out)[0]||null,P=multParts(b,r0).concat(S.res.food<=.001?[['🍎','Hunger',.5]]:[]).concat(b.fire>0?[['🔥','Brand',0]]:[]),m=P.reduce((a,p)=>a*p[2],1);
+    h+=`<div style="margin:6px 0"><div data-act="mdet" style="cursor:pointer"><b>📈 Produktion ×${f1(m)}</b> <small>${MDET?'▲ ausblenden':'▼ warum?'}</small></div>${!MDET?'':`<div style="font-size:13px;margin-top:4px">${P.map(p=>`<div style="display:flex;justify-content:space-between"><span>${p[0]} ${p[1]}</span><b style="color:${p[2]>=1?'#2e7d32':'#c0392b'}">×${p[2].toFixed(2).replace('.',',')}</b></div>`).join('')}</div>`}</div>`}
   {const k=distOf(b.type);if(k&&!isSite(b))h+=`<p>🏘️ Bezirk: ${inDist(b)?`✅ im ${DIST[k].i} ${DIST[k].n}-Bezirk → ${b.type==='house'||b.type==='apartment'?'zufriedenere Bewohner':SEATS[b.type]?'+20 % Plätze, +15 % Produktion':'+15 % Produktion'}`:`<span style="color:#b0782a">gehört in einen ${DIST[k].i} ${DIST[k].n}-Bezirk (+15 %)</span>`}${B[b.type].house&&nearLoud(b)?'<br>🔊 <b style="color:#c0392b">Lärm & Dreck von nahem Industriebetrieb!</b>':''}</p>`}
   if(b.fire>0)h+=`<div class="item" style="display:block;border:2px solid #c0392b"><b>🔥 Es brennt!</b>${bar('Gelöscht',b.fx)}<small>${fireCover(b)?'🚒 Die Feuerwehr ist im Einsatz.':'🪣 Die Bewohner löschen mit Eimern – das dauert. Brennt es zu lange, verliert das Gebäude eine Stufe.'}</small></div>`;
   if(b.type==='firestation'&&!isSite(b)){const r=B.firestation.cover+2*(b.level-1),n=S.buildings.filter(o=>fireRiskOf(o)&&Math.hypot(b.x+.5-(o.x+fpW(o.type)/2),b.y+.5-(o.y+fpH(o.type)/2))<=r+.5).length;h+=`<p>🚒 Reichweite: <b>${r} Felder</b> · schützt ${n} Gebäude${wcount(b)?'':' – <b style="color:#c0392b">keine Feuerwehrleute!</b>'}</p>`}
@@ -2169,20 +2189,19 @@ function updateUI(){
   const rt=econ(60,false),ore=S.tech.mining||S.res.ore>0||zonesCount()>1;
   const show={gold:has('stall')||S.res.gold>0,wood:1,stone:1,food:1,grain:S.tech.farm||S.res.grain>0,flour:S.tech.milling||S.res.flour>0,planks:S.tech.sawmill||S.res.planks>0,ore,iron:S.tech.smelting||S.res.iron>0,tools:S.tech.smithing||S.res.tools>0,research:1,diamond:S.tech.gemcraft||S.res.diamond>0,trash:has('dump')||S.res.trash>0,meat:S.tech.hunting||S.tech.husbandry||S.res.meat>0,cattle:S.tech.husbandry||S.res.cattle>0,coal:S.tech.coalmining||S.res.coal>0};
   let h='';
-  for(const r in RES){if(!show[r])continue;const v=S.res[r],d=rt[r]||0,full=v>=cap(r)-.01;
+  const CORE=['wood','stone','food','gold'];let hid=0;
+  for(const r in RES){if(!show[r])continue;if(!S.barAll&&!CORE.includes(r)){hid++;continue}const v=S.res[r],d=rt[r]||0,full=v>=cap(r)-.01;
     h+=`<div class="chip ${full?'full':''} ${r==='food'&&v<=0.001?'warn':''} ${r==='gold'&&has('stall')?'click':''}" ${r==='gold'&&has('stall')?'data-act="trade"':''}><span>${RES[r].i}</span><b>${fmt(v)}</b>${Math.abs(d)>=.05?`<small class="${d<0?'neg':''}">${d>0?'+':'−'}${f1(d)}/m</small>`:''}</div>`}
+  if(hid||S.barAll)h+=`<div class="chip click" data-act="barall" style="background:#efe4cf"><span>${S.barAll?'▲':'📦'}</span><b>${S.barAll?'weniger':'+'+hid}</b></div>`;
   const idle=idleV().length;
   const nk=S.vill.length-adults();h+=`<div class="chip ${homeless()>0?'warn':''}"><span>👥</span><b>${adults()}/${popCap()}</b><small>${nk?'+'+nk+'🧒 ':''}${idle} frei</small></div>`;
   if(S.hero)h+=`<div class="chip click" data-act="hero"><span>${HEROES[S.hero.c].i}</span><b>${heroStatus()}</b></div>`;
-  if(festOn())h+=`<div class="chip click" data-act="nav:village"><span>🎉</span><b>Fest</b></div>`;
+  if(festOn()&&!fairOn())h+=`<div class="chip click" data-act="nav:village"><span>🎉</span><b>Fest</b></div>`;
   if(fairOn())h+=`<div class="chip click" data-act="gofair"><span>🎡</span><b>Kirmes</b><small>${Math.ceil((S.fair.until-S.gt)/60)}m</small></div>`;
-  {const c=epochCheck();if(c&&c.ok)h+=`<div class="chip click warn" data-act="nav:epoch"><span>🕰️</span><b>${c.e.i}</b><small>bereit!</small></div>`}
   if(ADV_N)h+=`<div class="chip click ${ADV_LV>=2?'warn':''}" data-act="nav:advisor"><span>📋</span><b>${ADV_N}</b><small>${LVN[ADV_LV]}</small></div>`;
-  {const n=sickN();if(n)h+=`<div class="chip click ${n>5?'warn':''}" data-act="nav:village"><span>🤒</span><b>${n}</b><small>krank</small></div>`}
-  if(S.vill.length>15){const dl=dirtLvl();if(dl>.05)h+=`<div class="chip click ${dl>.5?'warn':''}" data-act="nav:village"><span>🤢</span><b>${Math.round(dl*100)}%</b><small>Müll</small></div>`}
   if(S.rs)h+=`<div class="chip click" data-act="nav:research"><span>🔬</span><b>${Math.ceil(S.rs.t/resSpeed()/60)}m</b></div>`;
-  const li=lvInfo();h+=`<div class="chip"><span>⭐</span><b>Lv ${li.L}</b><small>${Math.floor(li.x/li.n*100)}%</small></div>`;
-  const Hp=happy(),dk=darkness();h+=`<div class="chip"><span>${moodI(Hp.total)}</span><b>${Math.round(Hp.total*100)}%</b></div><div class="chip"><span>${SEAS[seasonIdx()].i}</span><b>Tag ${dayNo()}</b><small>${dk>.35?'🌙':dk>0?'🌆':'☀️'}</small></div>`;
+  const li=lvInfo();if(S.barAll)h+=`<div class="chip"><span>⭐</span><b>Lv ${li.L}</b><small>${Math.floor(li.x/li.n*100)}%</small></div>`;
+  const Hp=happy(),dk=darkness();h+=`<div class="chip click" data-act="nav:village"><span>${moodI(Hp.total)}</span><b>${Math.round(Hp.total*100)}%</b></div><div class="chip"><span>${SEAS[seasonIdx()].i}</span><b>Tag ${dayNo()}</b><small>${dk>.35?'🌙':dk>0?'🌆':'☀️'}</small></div>`;
   $('chips').innerHTML=h;
   $('sbadge').style.display=storyBadge()?'block':'none';
 }
@@ -2336,6 +2355,9 @@ function act(a,p){
     case 'qclr':buildQ=[];renderSheet();break;
     case 'qstart':{if(!buildQ.length)return;if(!canPay(B[buildQ[0]].cost)){toast('Nicht genug Ressourcen');return}const q={qn:buildQ.length};placing={type:buildQ[0],x:null,y:null,q,qi:1,qn:buildQ.length};roadMode=null;demoMode=false;closeSheet();sel=null;updateBanner();break}
     case 'gmove':gm={ids:[],st:'sel',x:null,y:null};placing=null;roadMode=null;demoMode=false;closeSheet();sel=null;updateBanner();break;
+    case 'mdet':MDET=!MDET;renderSheet();break;
+    case 'barall':S.barAll=!S.barAll;updateUI();break;
+    case 'vtab':VT=p;renderSheet();break;
     case 'advtog':S.advOff=!S.advOff;renderSheet();break;
     case 'ob':{const b=byId(+p);if(!b)return;centerOn(b.x+.5,b.y+.5);openSheet('b',b.id);break}
     case 'rdone':S.showDone=!S.showDone;renderSheet();break;
