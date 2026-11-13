@@ -95,7 +95,8 @@ textarea{width:100%;height:70px;font-size:11px;border-radius:8px;border:1px soli
 'use strict';
 // ======================= KONSTANTEN =======================
 const KEY='siedlertal_v1';
-const T=32, ZS=14, ZN=3, W=ZS*ZN, H=W;
+const T=32, ZS=14, ZN=5, W=ZS*ZN, H=W, OLDW=42, OFF=14, Z0=12;
+const OZ=z=>(z%3+1)+(Math.floor(z/3)+1)*ZN;
 const GR=0, TR=1, RK=2, OR=3, WA=4;
 const SPEED=1.6, FOOD_PER=0.02, SPAWN_T=25, OFFLINE_MAX=8*3600, DAY=720, SEASON=2880;
 const NODE={
@@ -109,9 +110,13 @@ const RES={
   planks:{n:'Bretter',i:'🪚'}, ore:{n:'Erz',i:'⛏️'}, iron:{n:'Eisen',i:'⚙️'}, tools:{n:'Werkzeuge',i:'🔧'},
   research:{n:'Forschung',i:'🔬'}, gold:{n:'Gold',i:'💰'}, diamond:{n:'Diamanten',i:'💎'}, trash:{n:'Müll',i:'🗑️'}, meat:{n:'Fleisch',i:'🥩'}, cattle:{n:'Vieh',i:'🐄'}, coal:{n:'Kohle',i:'⚫'}
 };
-const THEMES=['berg','wald','berg','see','start','wald','berg','wiese','see'];
-const THEME_N={start:'Lichtung',wald:'Dichter Wald',berg:'Erzberge',see:'Seenland',wiese:'Blumenwiese'};
-const THEME_D={start:'Euer Startgebiet.',wald:'Viele Bäume – ideal für Holzfäller.',berg:'Felsen und wertvolle Erzadern für Minen.',see:'Ein See mit Uferwald.',wiese:'Viel freie Baufläche.'};
+const THEMES=['eis','eis','eis','eis','gebirge', 'gebirge','berg','wald','berg','eis', 'gebirge','see','start','wald','steppe', 'sumpf','berg','wiese','see','steppe', 'sumpf','sumpf','wald','steppe','steppe'];
+const THEME_N={start:'Lichtung',wald:'Dichter Wald',berg:'Erzberge',see:'Seenland',wiese:'Blumenwiese',eis:'Eislandschaft',gebirge:'Hochgebirge',steppe:'Steppe',sumpf:'Sumpf'};
+const THEME_D={start:'Euer Startgebiet.',wald:'Viele Bäume – ideal für Holzfäller. 🌲 Holzfäller & Jäger +20 %.',berg:'Felsen und wertvolle Erzadern für Minen.',see:'Ein See mit Uferwald. 🎣 Fischer +20 %.',wiese:'Viel freie Baufläche.',
+ eis:'❄️ Ewiges Eis: Felder und Höfe bringen kaum etwas (−70 %), aber 💎 Diamantminen +100 %, Eisfischer +20 %. Bewohner werden hier öfter krank.',
+ gebirge:'⛰️ Hohe Gipfel voller Felsen, Erz und Kohle: Steinbrüche, Minen & Zechen +25 %, 💎 Diamantminen +50 %.',
+ steppe:'🌾 Weites, trockenes Grasland mit viel Platz: Bauernhöfe, Tierfarmen & Mühlen +30 %, wenig Holz.',
+ sumpf:'🐸 Feuchtes Sumpfland: Bauen dauert 50 % länger, dafür 🌿 Kräuterhütten doppelt so wirksam, Fischer & Jäger +20 %.'};
 const B={
   camp:{n:'Lagerfeuer',i:'🔥',roof:'#8a5530',house:2,store:true,fixed:true,desc:'Euer Startpunkt: Schlafplatz für 2 und Abgabestelle für Ressourcen.'},
   house:{n:'Haus',i:'🏠',roof:'#c0503a',cost:{wood:12,stone:4},house:2,store:true,desc:'Wohnraum für 2 Bewohner pro Stufe. Auch Abgabestelle.'},
@@ -312,6 +317,11 @@ const STORY=[
   rw:{xp:2000,pg:5,un:'s_monument',vill:10,bless:1,txt:'+10 Bewohner, 🔮 Denkmal, Segen: +15 % auf alles'}}
 ];
 const STORY_NEXT={lv:20,t:'Ein neuer Wanderer am Horizont …'};
+for(const ch of STORY)for(const st of (ch.steps||[]))if(st.z!=null)st.z=OZ(st.z);
+const BIO_G={steppe:['#c2b064','#b9a75c','#cbb96c','#bfae60'],sumpf:['#4d6838','#55703e','#486233','#5a7440'],gebirge:['#8f9282','#979a89','#8a8d7d','#9fa190']};
+const biomeAt=(x,y)=>THEMES[zoneOf(x,y)];
+const BIO_B={wald:{woodcutter:1.2,hunter:1.2},see:{fisher:1.2},eis:{farm:.3,ranch:.3,gatherer:.5,diamondmine:2,fisher:1.2},gebirge:{quarry:1.25,mine:1.25,coalmine:1.25,diamondmine:1.5},steppe:{farm:1.3,ranch:1.3,mill:1.3,woodcutter:.8},sumpf:{herbs:2,fisher:1.2,hunter:1.2}};
+function bioMult(b){const bb=BIO_B[biomeAt(b.x,b.y)];return bb&&bb[b.type]||1}
 const NEAR_N={1:'Baum',2:'Felsen',3:'Erzader',4:'Wasser'};
 const HOUSE_BEDS=[2,4,7,10,14,18,23,28,34,40], HOUSE_I=['🛖','🏠','🏡','🏘️','🏘️','🏘️','🏢','🏢','🏰','🏰'], HOUSE_ROOF=['#9a6b3a','#c0503a','#b8433a','#8e3b5a','#3d5a8e','#2e6a7a','#5a5a6a','#4a4a7a','#7a2a4a','#8a6a1a'];
 const SEAS=[
@@ -382,57 +392,52 @@ let toastT=0;
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600)}
 
 // ======================= KARTE =======================
-function genMap(seed){
-  const r=rng(seed), tiles=new Array(W*H).fill(GR);
+function genZone(tiles,z,r){
   const set=(x,y,t)=>{if(inMap(x,y)&&tiles[x+y*W]===GR)tiles[x+y*W]=t};
-  const blob=(cx,cy,t,rad,dens)=>{
-    for(let y=Math.floor(cy-rad-1);y<=cy+rad+1;y++)for(let x=Math.floor(cx-rad-1);x<=cx+rad+1;x++){
-      if(zoneOf(Math.floor(cx),Math.floor(cy))!==zoneOf(x,y))continue;
-      const d=Math.hypot(x+.5-cx,y+.5-cy);
-      if(d<=rad&&r()<dens*(1-d/(rad+1.5))+0.15)set(x,y,t);
-    }};
-  const cluster=(zx,zy,t,rad,dens)=>blob(zx*ZS+2+r()*(ZS-4),zy*ZS+2+r()*(ZS-4),t,rad,dens);
-  for(let z=0;z<9;z++){
-    const zx=z%ZN, zy=Math.floor(z/ZN), th=THEMES[z];
-    if(th==='see'){
-      const cx=zx*ZS+7,cy=zy*ZS+7;
-      for(let y=zy*ZS;y<zy*ZS+ZS;y++)for(let x=zx*ZS;x<zx*ZS+ZS;x++){if(Math.hypot(x+.5-cx,y+.5-cy)+r()*1.3<4.3)tiles[x+y*W]=WA}
-      for(let i=0;i<5;i++)cluster(zx,zy,TR,2,.85);
-      cluster(zx,zy,RK,1.3,.8);
-    }else if(th==='wald'){
-      for(let i=0;i<8;i++)cluster(zx,zy,TR,2.5,.95);
-      cluster(zx,zy,RK,1.5,.8);
-    }else if(th==='berg'){
-      for(let i=0;i<5;i++)cluster(zx,zy,RK,1.8,.9);
-      for(let i=0;i<3;i++)cluster(zx,zy,OR,1.3,.95);
-      for(let i=0;i<2;i++)cluster(zx,zy,TR,1.8,.7);
-    }else if(th==='wiese'){
-      for(let i=0;i<2;i++)cluster(zx,zy,TR,1.6,.6);
-      cluster(zx,zy,RK,1.1,.7);
-    }else{ // Start
-      const c=ZS+7;
-      [[-4.5,-3.5],[4,-4.5],[-5,3.5],[3.5,4.5],[-1,-6]].forEach(o=>blob(c+o[0],c+o[1],TR,2.3,.95));
-      [[5.5,0.5],[-2,5.5]].forEach(o=>blob(c+o[0],c+o[1],RK,1.5,.95));
-    }
-  }
-  const c=ZS+7; // Startplatz freiräumen
-  for(let y=c-3;y<=c+3;y++)for(let x=c-3;x<=c+3;x++)if(Math.hypot(x-c,y-c)<2.8)tiles[x+y*W]=GR;
-  return tiles;
+  const blob=(cx,cy,t,rad,dens)=>{for(let y=Math.floor(cy-rad-1);y<=cy+rad+1;y++)for(let x=Math.floor(cx-rad-1);x<=cx+rad+1;x++){if(zoneOf(Math.floor(cx),Math.floor(cy))!==zoneOf(x,y)||!inMap(x,y))continue;const d=Math.hypot(x+.5-cx,y+.5-cy);if(d<=rad&&r()<dens*(1-d/(rad+1.5))+0.15)set(x,y,t)}};
+  const zx=z%ZN,zy=Math.floor(z/ZN),th=THEMES[z],cluster=(t,rad,dens)=>blob(zx*ZS+2+r()*(ZS-4),zy*ZS+2+r()*(ZS-4),t,rad,dens);
+  if(th==='see'){const cx=zx*ZS+7,cy=zy*ZS+7;for(let y=zy*ZS;y<zy*ZS+ZS;y++)for(let x=zx*ZS;x<zx*ZS+ZS;x++){if(Math.hypot(x+.5-cx,y+.5-cy)+r()*1.3<4.3)tiles[x+y*W]=WA}for(let i=0;i<5;i++)cluster(TR,2,.85);cluster(RK,1.3,.8)}
+  else if(th==='wald'){for(let i=0;i<8;i++)cluster(TR,2.5,.95);cluster(RK,1.5,.8)}
+  else if(th==='berg'){for(let i=0;i<5;i++)cluster(RK,1.8,.9);for(let i=0;i<3;i++)cluster(OR,1.3,.95);for(let i=0;i<2;i++)cluster(TR,1.8,.7)}
+  else if(th==='wiese'){for(let i=0;i<2;i++)cluster(TR,1.6,.6);cluster(RK,1.1,.7)}
+  else if(th==='gebirge'){for(let i=0;i<8;i++)cluster(RK,2.1,.95);for(let i=0;i<4;i++)cluster(OR,1.4,.95);cluster(TR,1.3,.6)}
+  else if(th==='eis'){for(let i=0;i<3;i++)cluster(RK,1.6,.8);for(let i=0;i<2;i++)cluster(OR,1.2,.9);for(let i=0;i<3;i++)cluster(TR,1.2,.6);if(r()<.6){const cx=zx*ZS+4+r()*6,cy=zy*ZS+4+r()*6;for(let y=zy*ZS;y<zy*ZS+ZS;y++)for(let x=zx*ZS;x<zx*ZS+ZS;x++)if(Math.hypot(x+.5-cx,y+.5-cy)+r()*1.2<2.6)tiles[x+y*W]=WA}}
+  else if(th==='steppe'){cluster(TR,1.2,.5);cluster(RK,1.1,.6)}
+  else if(th==='sumpf'){for(let i=0;i<6;i++){const cx=zx*ZS+2+r()*(ZS-4),cy=zy*ZS+2+r()*(ZS-4),rad=1+r()*1.6;for(let y=Math.floor(cy-rad);y<=cy+rad;y++)for(let x=Math.floor(cx-rad);x<=cx+rad;x++)if(inMap(x,y)&&zoneOf(x,y)===z&&Math.hypot(x+.5-cx,y+.5-cy)+r()*.8<rad)tiles[x+y*W]=WA}for(let i=0;i<5;i++)cluster(TR,1.8,.8)}
+  else if(th==='start'){const c=zx*ZS+7,cy=zy*ZS+7;[[-4.5,-3.5],[4,-4.5],[-5,3.5],[3.5,4.5],[-1,-6]].forEach(o=>blob(c+o[0],cy+o[1],TR,2.3,.95));[[5.5,0.5],[-2,5.5]].forEach(o=>blob(c+o[0],cy+o[1],RK,1.5,.95));
+    for(let y=cy-3;y<=cy+3;y++)for(let x=c-3;x<=c+3;x++)if(Math.hypot(x-c,y-cy)<2.8)tiles[x+y*W]=GR}
 }
+function genMap(seed){const r=rng(seed),tiles=new Array(W*H).fill(GR);for(let z=0;z<ZN*ZN;z++)genZone(tiles,z,r);return tiles}
+const CX=(Z0%ZN)*ZS+7,CY=Math.floor(Z0/ZN)*ZS+7;
+function migrateWorld(o){
+  if(!o||!Array.isArray(o.tiles)||o.tiles.length!==OLDW*OLDW)return o;
+  const N=W*H,mv=(arr,fill)=>{const n=new Array(N).fill(fill);if(Array.isArray(arr))for(let y=0;y<OLDW;y++)for(let x=0;x<OLDW;x++)n[(x+OFF)+(y+OFF)*W]=arr[x+y*OLDW];return n};
+  const nt=new Array(N).fill(GR),r=rng((o.seed|0)+777);for(let z=0;z<ZN*ZN;z++){const zx=z%ZN,zy=Math.floor(z/ZN);if(zx>=1&&zx<=3&&zy>=1&&zy<=3)continue;genZone(nt,z,r)}
+  for(let y=0;y<OLDW;y++)for(let x=0;x<OLDW;x++)nt[(x+OFF)+(y+OFF)*W]=o.tiles[x+y*OLDW];
+  o.tiles=nt;o.amt=mv(o.amt,0);for(let i=0;i<N;i++)if(NODE[o.tiles[i]]&&!(o.amt[i]>0)&&!((i%W)>=OFF&&(i%W)<OFF+OLDW&&Math.floor(i/W)>=OFF&&Math.floor(i/W)<OFF+OLDW))o.amt[i]=NODE[o.tiles[i]].max;
+  o.rt=mv(o.rt,0);o.road=mv(o.road,0);o.dist=mv(o.dist,0);
+  const nz=new Array(ZN*ZN).fill(0);(o.zones||[]).forEach((v,z)=>{if(v)nz[OZ(z)]=1});o.zones=nz;
+  const sh=q=>{if(q&&typeof q.x==='number'){q.x+=OFF;q.y+=OFF}};
+  for(const b of o.buildings||[])sh(b);
+  for(const v of o.vill||[]){sh(v);if(v.job&&typeof v.job.x==='number')sh(v.job);if(typeof v.tx==='number'){v.tx+=OFF;v.ty+=OFF}}
+  if(o.hero){sh(o.hero);if(typeof o.hero.tx==='number'){o.hero.tx+=OFF;o.hero.ty+=OFF}if(o.hero.flag)sh(o.hero.flag)}
+  if(o.story&&o.story.mk)for(const k in o.story.mk)sh(o.story.mk[k]);
+  if(o.fair)sh(o.fair);
+  o.world=2;return o}
 
 // ======================= SPIELSTAND =======================
 let S;
 function newGame(){
   const seed=(Math.random()*1e9)|0;
   S={v:1,seed,time:Date.now(),res:{wood:15,stone:5,food:15,grain:0,flour:0,planks:0,ore:0,iron:0,tools:0,research:0,gold:0,diamond:0,trash:0,meat:0,cattle:0,coal:0},
-     buildings:[],vill:[],zones:[0,0,0,0,1,0,0,0,0],tech:{},nid:1,spawnT:0,flags:{},made:{},goal:0,gt:90,tv:2,xp:0,story:{ch:0,on:0,st:0,pages:[],mk:{},nt:-1}};
+     buildings:[],vill:[],zones:Array.from({length:ZN*ZN},(_,i)=>i===Z0?1:0),world:2,tech:{},nid:1,spawnT:0,flags:{},made:{},goal:0,gt:90,tv:2,xp:0,story:{ch:0,on:0,st:0,pages:[],mk:{},nt:-1}};
   S.tiles=genMap(seed);
   S.amt=S.tiles.map(t=>NODE[t]?NODE[t].max:0);
   S.rt=S.tiles.map(()=>0);
   S.road=S.tiles.map(()=>0);S.dist=S.tiles.map(()=>0);
   S.mkt={};for(const r in PRICE)S.mkt[r]={f:1,t:1};S.lastDay=1;S.bank={sav:0,fixed:[],loan:0};
-  S.buildings.push({id:S.nid++,type:'camp',x:21,y:21,level:1});
-  spawnV(21.2,22.2); spawnV(21.9,22.3);
+  S.buildings.push({id:S.nid++,type:'camp',x:CX,y:CY,level:1});
+  spawnV(CX+.2,CY+1.2); spawnV(CX+.9,CY+1.3);
 }
 function persona(v){if(!v.name)v.name=NAMES[Math.floor(Math.random()*NAMES.length)];if(!v.g)v.g=NAMES_F.includes(v.name)?'f':NAMES_M.includes(v.name)?'m':(Math.random()<.5?'f':'m');if(v.edu==null)v.edu=0;if(!v.trait)v.trait=TRAITS[Math.floor(Math.random()*TRAITS.length)];if(v.mo==null)v.mo=Math.round((Math.random()-.5)*16)/100}
 function spawnV(x,y){const v={id:S.nid++,x,y,shirt:SHIRTS[Math.floor(Math.random()*SHIRTS.length)],job:null,ph:null,carry:null,slot:0};persona(v);S.vill.push(v)}
@@ -448,7 +453,7 @@ function adopt(o){S=o;if(!Array.isArray(o.dist)||o.dist.length!==W*H)o.dist=o.ti
   if(!S.mkt)S.mkt={};for(const r in PRICE)if(!S.mkt[r])S.mkt[r]={f:1,t:1};if(S.lastDay==null)S.lastDay=dayNo();
   if(!S.story)S.story={ch:0,on:0,st:0,pages:[],mk:{},nt:-1};
   if(S.xp==null){let x=0;for(const b of S.buildings){if(b.type!=='camp')x+=15;for(let l=2;l<=b.level;l++)x+=25*l}x+=40*Object.keys(S.tech).length+100*(zonesCount()-1)+30*S.goal;S.xp=x}for(const r in RES)if(S.res[r]==null)S.res[r]=0;S.vill.forEach(persona);}
-function load(){try{const s=localStorage.getItem(KEY);if(s){const o=JSON.parse(s);if(valid(o)){adopt(o);return true}}}catch(e){}return false}
+function load(){try{const s=localStorage.getItem(KEY);if(s){const o=migrateWorld(JSON.parse(s));if(valid(o)){adopt(o);return true}}}catch(e){}return false}
 
 // ======================= FREIE BEWOHNER =======================
 const HELP=.3,EXP_T=300,EXP_MAX=3,FEST_T=DAY,FEST_CD=2*DAY;
@@ -715,11 +720,11 @@ function drawFair(){
 // ======================= GESUNDHEIT =======================
 const SICK_T=300;
 const sickN=()=>S.vill.reduce((n,v)=>n+(v.sick>0?1:0),0);
-function sickRisk(){return .00006*(1+3*dirtLvl()+(S.res.food<=.001?3:0)+(seasonIdx()===3?1.2:0))*(S.res.meat>1?.85:1)}
+function sickRisk(){const hs=S.buildings.filter(b=>b.type==='house'),ice=hs.length?hs.filter(b=>biomeAt(b.x,b.y)==='eis').length/hs.length:0;return .00006*(1+1.5*ice+3*dirtLvl()+(S.res.food<=.001?3:0)+(seasonIdx()===3?1.2:0))*(S.res.meat>1?.85:1)}
 function hospBeds(b){const w=wcount(b);return w?Math.round(4*b.level*Math.min(1,w/2)):0}
 function healthTick(dt,live){
   const hos=S.buildings.filter(b=>b.type==='hospital'&&!isSite(b));
-  let care=0;for(const b of S.buildings)if(b.type==='herbs'&&!isSite(b))care+=wcount(b)*b.level;
+  let care=0;for(const b of S.buildings)if(b.type==='herbs'&&!isSite(b))care+=wcount(b)*b.level*bioMult(b);
   const occ={};for(const v of S.vill)if(v.sick>0&&v.hosp)occ[v.hosp]=(occ[v.hosp]||0)+1;
   const home=S.vill.filter(v=>v.sick>0&&!v.hosp).length,hf=1+Math.min(1.5,care*3/Math.max(1,home));
   for(const v of S.vill){
@@ -782,7 +787,7 @@ const slots=b=>B[b.type].slots?B[b.type].slots+(b.level-1):0;
 function countNear(x,y,t,r){let n=0;for(let yy=y-r;yy<=y+r;yy++)for(let xx=x-r;xx<=x+r;xx++){if(inMap(xx,yy)&&S.tiles[xx+yy*W]===t&&Math.hypot(xx-x,yy-y)<=r+.5)n++}return n}
 function effAt(type,x,y){const d=B[type];if(d.near==null)return 1;const n=countNear(x,y,d.near,d.r);return n===0?0:Math.min(1,.4+n*.15)}
 const eff=b=>effAt(b.type,b.x,b.y);
-function mult(b,r){let m=1+.5*(b.level-1);if(S.tech.tools1&&(r==='wood'||r==='stone'))m*=1.2;if(S.tech.tools2)m*=1.3;if(S.tech.tools3)m*=1.25;if(S.tech.diamondtools)m*=1.2;if(S.tech.gemcraft2){if(r==='diamond')m*=1.5;if(r==='stone'||r==='ore')m*=1.15}if(hasRoad(b))m*=1.1;if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))m*=1+.25*PWR;if(S.story&&S.story.bless)m*=1.15;const hc=S.hero&&S.hero.c;if(hc==='thordis'&&r==='wood')m*=1.1;if(hc==='elmiran'&&r==='food')m*=1.15;if(hc==='zara'&&r==='research')m*=1.25;if(S.tech.agri2&&(r==='food'||r==='grain'))m*=1.25;if(S.tech.mining2&&(r==='stone'||r==='ore'))m*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))m*=1.15;m*=1+.1*(S.epoch||0);m*=1+ROBO;if(inDist(b))m*=1.15;m*=.8+.4*happy().total;if(B[b.type].season&&(r==='food'||r==='grain'))m*=SEAS[seasonIdx()].food;return m}
+function mult(b,r){let m=1+.5*(b.level-1);if(S.tech.tools1&&(r==='wood'||r==='stone'))m*=1.2;if(S.tech.tools2)m*=1.3;if(S.tech.tools3)m*=1.25;if(S.tech.diamondtools)m*=1.2;if(S.tech.gemcraft2){if(r==='diamond')m*=1.5;if(r==='stone'||r==='ore')m*=1.15}if(hasRoad(b))m*=1.1;if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))m*=1+.25*PWR;if(S.story&&S.story.bless)m*=1.15;const hc=S.hero&&S.hero.c;if(hc==='thordis'&&r==='wood')m*=1.1;if(hc==='elmiran'&&r==='food')m*=1.15;if(hc==='zara'&&r==='research')m*=1.25;if(S.tech.agri2&&(r==='food'||r==='grain'))m*=1.25;if(S.tech.mining2&&(r==='stone'||r==='ore'))m*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))m*=1.15;m*=1+.1*(S.epoch||0);m*=1+ROBO;if(inDist(b))m*=1.15;m*=bioMult(b);m*=.8+.4*happy().total;if(B[b.type].season&&(r==='food'||r==='grain'))m*=SEAS[seasonIdx()].food;return m}
 const hasRoad=b=>{const w=fpW(b.type),h=fpH(b.type);for(let y=b.y-1;y<=b.y+h;y++)for(let x=b.x-1;x<=b.x+w;x++){const ins=x>=b.x&&x<b.x+w&&y>=b.y&&y<b.y+h,cor=(x<b.x||x>=b.x+w)&&(y<b.y||y>=b.y+h);if(ins||cor||!inMap(x,y))continue;if(S.road[x+y*W])return true}return false};
 function cap(r){if(r==='research'||r==='gold'||r==='diamond')return Infinity;if(r==='trash'){let c=50;for(const b of S.buildings)if(b.type==='dump'&&!isSite(b))c+=DUMP_CAP*b.level;return c}let c=100;for(const b of S.buildings)if(B[b.type].cap&&!isSite(b))c+=B[b.type].cap*b.level;return c}
 function popCap(){let c=0;for(const b of S.buildings)c+=beds(b);return c}
@@ -1348,13 +1353,14 @@ function setupTerrain(){terr=document.createElement('canvas');terr.width=W*T;ter
 let curSi=0;
 const EP_HI=[HOUSE_I,['🏠','🏠','🏡','🏡','🏘️','🏘️','🏢','🏢','🏛️','🏛️'],['🏠','🏡','🏡','🏢','🏢','🏢','🏬','🏬','🏙️','🏙️'],['🏡','🏡','🏢','🏢','🏬','🏬','🏙️','🏙️','🌆','🌆']];
 const EP_ROOF=[HOUSE_ROOF,['#8a3a2a','#9a4030','#7a3426','#8c4a32','#6e2e22','#7a3a2a','#5e3a30','#6a2e26','#4e2a22','#5a3022'],['#9aa3ad','#b0b6bd','#8a939e','#7d8894','#a3adb8','#6e7a88','#5f6b7a','#7a8798','#4f5b6b','#56657a'],['#2e8a9a','#2a7a8f','#3a6a9a','#2e5f8f','#4a5aa0','#3a4f9a','#2a9a8a','#2a8aa0','#5a4aa0','#6a3aa0']];
-function drawAllTerrain(){if(!tctx)return;curSi=seasonIdx();for(let y=0;y<H;y++)for(let x=0;x<W;x++)drawTile(tctx,x,y);for(let z=0;z<9;z++)if(!S.zones[z])fog(z)}
+function drawAllTerrain(){if(!tctx)return;curSi=seasonIdx();for(let y=0;y<H;y++)for(let x=0;x<W;x++)drawTile(tctx,x,y);for(let z=0;z<ZN*ZN;z++)if(!S.zones[z])fog(z)}
 function fog(z){const zx=z%ZN,zy=Math.floor(z/ZN);tctx.fillStyle='rgba(14,18,28,.62)';tctx.fillRect(zx*ZS*T,zy*ZS*T,ZS*T,ZS*T)}
 function dirtyAround(x,y){for(const [a,b] of [[0,0],[1,0],[-1,0],[0,1],[0,-1]])if(inMap(x+a,y+b))dirtyTile(x+a+(y+b)*W)}
 function dirtyTile(i){if(!tctx)return;const x=i%W,y=Math.floor(i/W);drawTile(tctx,x,y);const z=zoneOf(x,y);if(!S.zones[z]){tctx.fillStyle='rgba(14,18,28,.62)';tctx.fillRect(x*T,y*T,T,T)}}
 function drawTile(c,x,y){
   const i=x+y*W,t=S.tiles[i],px=x*T,py=y*T,h=hash(x,y),cx=px+T/2,cy=py+T/2;
-  const SE=SEAS[curSi];
+  const bio=THEMES[zoneOf(x,y)];let SE=SEAS[bio==='eis'?3:curSi];
+  if(curSi!==3&&BIO_G[bio])SE=Object.assign({},SE,{grass:BIO_G[bio],fl:bio==='steppe'?0:SE.fl});
   c.fillStyle=SE.grass[h%4];c.fillRect(px,py,T,T);
   if(h%3===0){c.fillStyle='rgba(255,255,255,.07)';c.fillRect(px+h%24+2,py+(h>>4)%24+2,3,2)}
   if(SE.fl&&h%11===0&&t===GR&&!S.road[i]){c.fillStyle=['#f5e663','#f2f2f2','#e98ad0'][(h>>5)%3];c.beginPath();c.arc(px+(h>>3)%26+3,py+(h>>7)%26+3,1.6,0,7);c.fill()}
@@ -1740,7 +1746,7 @@ function render(dt){
   ctx.textAlign='center';ctx.textBaseline='middle';
   for(const f of floats){ctx.globalAlpha=Math.max(0,1-f.a/1.5);ctx.font='bold 11px sans-serif';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.6)';const yy=(f.y-f.a*.6)*T;ctx.strokeText(f.t,f.x*T,yy);ctx.fillStyle='#fff';ctx.fillText(f.t,f.x*T,yy)}
   ctx.globalAlpha=1;
-  for(let zz=0;zz<9;zz++){
+  for(let zz=0;zz<ZN*ZN;zz++){
     if(S.zones[zz])continue;
     const zx=(zz%ZN)*ZS*T+ZS*T/2,zy=Math.floor(zz/ZN)*ZS*T+ZS*T/2;
     ctx.font=`${T*1.6}px sans-serif`;ctx.fillText('🔒',zx,zy-T*.8);
@@ -2107,6 +2113,7 @@ function sheetBuilding(b){
   if(d.joy&&!SEATS[b.type])h+=`<p>🎉 Freude: <b>+${joyOf(d)*b.level}</b>${d.sj?` · jetzt: <b>${d.sn[seasonIdx()]}</b><br><small>${['🌸','☀️','🍂','❄️'].map((x,i)=>x+' +'+d.sj[i]*b.level).join(' · ')}</small>`:''}</p>`;
   if(d.store)h+=`<p>📥 Abgabestelle für Sammler</p>`;
   if(b.type==='tradepost'&&!isSite(b)){const on=(S.routes||[]).filter(r=>r.on).length;h+=`<p>🐴 ${(S.routes||[]).length}/${routeMax()} Routen · ${on} aktiv · Ladung bis ${routeCap()}</p><button class="big" data-act="nav:routes">🐴 Handelsrouten verwalten</button>`}
+  {const bv=bioMult(b);if(bv!==1)h+=`<p>🗺️ Landschaft ${THEME_N[biomeAt(b.x,b.y)]}: <b style="color:${bv>1?'#2e7d32':'#c0392b'}">${bv>1?'+':''}${Math.round((bv-1)*100)} %</b></p>`}
   {const k=distOf(b.type);if(k&&!isSite(b))h+=`<p>🏘️ Bezirk: ${inDist(b)?`✅ im ${DIST[k].i} ${DIST[k].n}-Bezirk → ${b.type==='house'||b.type==='apartment'?'zufriedenere Bewohner':SEATS[b.type]?'+20 % Plätze, +15 % Produktion':'+15 % Produktion'}`:`<span style="color:#b0782a">gehört in einen ${DIST[k].i} ${DIST[k].n}-Bezirk (+15 %)</span>`}${B[b.type].house&&nearLoud(b)?'<br>🔊 <b style="color:#c0392b">Lärm & Dreck von nahem Industriebetrieb!</b>':''}</p>`}
   if(b.fire>0)h+=`<div class="item" style="display:block;border:2px solid #c0392b"><b>🔥 Es brennt!</b>${bar('Gelöscht',b.fx)}<small>${fireCover(b)?'🚒 Die Feuerwehr ist im Einsatz.':'🪣 Die Bewohner löschen mit Eimern – das dauert. Brennt es zu lange, verliert das Gebäude eine Stufe.'}</small></div>`;
   if(b.type==='firestation'&&!isSite(b)){const r=B.firestation.cover+2*(b.level-1),n=S.buildings.filter(o=>fireRiskOf(o)&&Math.hypot(b.x+.5-(o.x+fpW(o.type)/2),b.y+.5-(o.y+fpH(o.type)/2))<=r+.5).length;h+=`<p>🚒 Reichweite: <b>${r} Felder</b> · schützt ${n} Gebäude${wcount(b)?'':' – <b style="color:#c0392b">keine Feuerwehrleute!</b>'}</p>`}
@@ -2151,7 +2158,7 @@ function sheetZone(z){
   const th=THEMES[z],c=zoneCost();
   let h=`<h3>🔒 ${THEME_N[th]}</h3><p class="desc">${THEME_D[th]}</p>`;
   if(!zoneAdj(z))h+='<p class="note">Schalte zuerst eine angrenzende Zone frei.</p>';
-  else h+=`<button class="big" data-act="unlock:${z}" ${canPay(c)?'':'disabled'}>🔓 Freischalten<br><small class="c">${costHtml(c)}</small></button><p class="note">Jede neue Zone erhöht die maximale Ausbaustufe deiner Gebäude um 1 (bis Stufe 5).</p>`;
+  else h+=`<button class="big" data-act="unlock:${z}" ${canPay(c)?'':'disabled'}>🔓 Freischalten<br><small class="c">${costHtml(c)}</small></button><p class="note">Jede neue Zone erhöht die maximale Ausbaustufe deiner Gebäude um 1 (bis Stufe 5) und bringt Platz und Rohstoffe.</p>`;
   return h;
 }
 function renderGoal(){
@@ -2214,6 +2221,7 @@ function updateBanner(){
   if(placing.x==null)t+=placing.move?'tippe auf das neue Feld':'tippe auf ein freies Feld';
   else if(!validPlace(placing.x,placing.y)){const z=zoneOf(placing.x,placing.y);t+=!S.zones[z]?'Zone noch gesperrt':buildingAt(placing.x,placing.y)?'Feld ist belegt':'Hier kann nicht gebaut werden'}
   else{ok=true;if(d.near!=null){const e=effAt(placing.type,placing.x,placing.y);t+=`Effizienz <b style="color:${e===0?'#c0392b':e<.6?'#c27c0e':'#4f8a2b'}">${Math.round(e*100)} %</b>`;if(e===0){t+=` (kein ${NEAR_N[d.near]} in Reichweite)`;ok=false}}else t+='Feld frei'}
+  if(ok){const bm=BIO_B[biomeAt(placing.x,placing.y)],bv=bm&&bm[placing.type];if(bv&&bv!==1)t+=` · ${bv>1?'✅':'⚠️'} ${THEME_N[biomeAt(placing.x,placing.y)]} ${bv>1?'+':''}${Math.round((bv-1)*100)} %`;if(biomeAt(placing.x,placing.y)==='sumpf')t+=' · 🐸 Bauzeit +50 %'}
   if(ok&&dk&&S.dist){const inn=distAt(placing.x,placing.y)===dk;t+=inn?` · ✅ ${DIST[dk].i} Bezirk +15 %`:` · <small>passt in ${DIST[dk].i} ${DIST[dk].n}</small>`}
   $('bText').innerHTML=t;$('bOk').disabled=!ok;bn.classList.add('on');
 }
@@ -2235,7 +2243,7 @@ function act(a,p){
       if(gm){if(gm.st==='sel'){if(gm.ids.length){gm.st='place';gm.x=null}updateBanner();break}if(!gmValid())return;for(const {b,nx,ny} of gmLayout()){dirtyAround(b.x,b.y);b.x=nx;b.y=ny;dirtyAround(b.x,b.y)}toast(`↔️ ${gm.ids.length} Gebäude verschoben`);gm=null;updateBanner();save();break}
       if(demoMode){const d_=demoTarget;if(d_){if(d_.k==='b'){const b=byId(d_.id);if(b)doDemolish(b)}else if(d_.k==='road')removeRoad(d_.i);else doClear(d_.i)}demoTarget=null;updateBanner();break}
       if(placing&&placing.ser){const d=B[placing.type],sp=placing.ser.slice();let n=0;
-        for(const q of sp){if(!validPlace(q.x,q.y)||!canPay(d.cost))continue;pay(d.cost);const bt=buildTime(d.cost);const b={id:S.nid++,type:placing.type,x:q.x,y:q.y,level:1,t:Date.now(),cs:bt,ct:bt,qs:Date.now(),pc:Object.assign({},d.cost)};S.buildings.push(b);dirtyAround(b.x,b.y);n++}
+        for(const q of sp){if(!validPlace(q.x,q.y)||!canPay(d.cost))continue;pay(d.cost);const bt=buildTime(d.cost)*(biomeAt(q.x,q.y)==='sumpf'?1.5:1);const b={id:S.nid++,type:placing.type,x:q.x,y:q.y,level:1,t:Date.now(),cs:bt,ct:bt,qs:Date.now(),pc:Object.assign({},d.cost)};S.buildings.push(b);dirtyAround(b.x,b.y);n++}
         placing=null;updateBanner();if(S.hero&&S.hero.cmd!=='inv'){heroFree();S.hero.cmd='auto'}
         toast(n?`🚧 ${n} Baustelle${n>1?'n':''} ${d.i} ${d.n} angelegt${n<sp.length?` (${sp.length-n} nicht möglich)`:''} – Bauhelfer packen mit an!`:'Nichts gebaut');save();break}
       if(!placing||placing.x==null)return;
@@ -2244,7 +2252,7 @@ function act(a,p){
       if(placing.move){const b=byId(placing.move);if(b){const ox=b.x,oy=b.y;b.x=placing.x;b.y=placing.y;dirtyAround(ox,oy);dirtyAround(b.x,b.y);toast(`↔️ ${d.n} verschoben`)}placing=null;updateBanner();save();break}
       if(!canPay(d.cost)){toast('Nicht genug Ressourcen');return}
       pay(d.cost);
-      const bt=buildTime(d.cost),b={id:S.nid++,type:placing.type,x:placing.x,y:placing.y,level:1,t:Date.now(),cs:bt,ct:bt,qs:Date.now(),pc:Object.assign({},d.cost)};S.buildings.push(b);dirtyAround(b.x,b.y);
+      const bt=buildTime(d.cost)*(biomeAt(placing.x,placing.y)==='sumpf'?1.5:1),b={id:S.nid++,type:placing.type,x:placing.x,y:placing.y,level:1,t:Date.now(),cs:bt,ct:bt,qs:Date.now(),pc:Object.assign({},d.cost)};S.buildings.push(b);dirtyAround(b.x,b.y);
       const wasQ=placing.q;placing=null;
       if(wasQ){buildQ.shift();if(buildQ.length){if(canPay(B[buildQ[0]].cost)){const qi=wasQ.qn-buildQ.length+1;placing={type:buildQ[0],x:null,y:null,q:wasQ,qi,qn:wasQ.qn}}else{toast(`Nicht genug Ressourcen für ${B[buildQ[0]].i} ${B[buildQ[0]].n} – Rest der Auswahl abgebrochen`);buildQ=[]}}}
       updateBanner();
@@ -2265,8 +2273,8 @@ function act(a,p){
     case 'export':{const s=btoa(unescape(encodeURIComponent(serialize())));
       const done=()=>toast('📋 Spielstand kopiert');
       try{navigator.clipboard.writeText(s).then(done,()=>{$('imp').value=s;toast('Kopieren nicht möglich – Text steht im Feld unten')})}catch(e){$('imp').value=s;toast('Text steht im Feld unten – bitte manuell kopieren')}break}
-    case 'import':{try{const o=JSON.parse(decodeURIComponent(escape(atob($('imp').value.trim()))));if(!valid(o))throw 0;adopt(o);drawAllTerrain();closeSheet();centerOn(21,21);toast('📥 Spielstand geladen');save();if(!S.hero)modal(heroPicker(false))}catch(e){toast('Ungültiger Spielstand')}break}
-    case 'newgame':if(!newConfirm){newConfirm=true;renderSheet();return}newGame();drawAllTerrain();closeSheet();centerOn(21,21);save();modal(heroPicker(false));break;
+    case 'import':{try{const o=migrateWorld(JSON.parse(decodeURIComponent(escape(atob($('imp').value.trim())))));if(!valid(o))throw 0;adopt(o);drawAllTerrain();closeSheet();centerOn(S.buildings[0]?S.buildings[0].x:CX,S.buildings[0]?S.buildings[0].y:CY);toast('📥 Spielstand geladen');save();if(!S.hero)modal(heroPicker(false))}catch(e){toast('Ungültiger Spielstand')}break}
+    case 'newgame':if(!newConfirm){newConfirm=true;renderSheet();return}newGame();drawAllTerrain();closeSheet();centerOn(S.buildings[0]?S.buildings[0].x:CX,S.buildings[0]?S.buildings[0].y:CY);save();modal(heroPicker(false));break;
     case 'vfree':{const v=S.vill.find(x=>x.id===+p);if(v){const b=v.job&&v.job.t==='b'&&byId(v.job.id);if(v.carry){addRes(v.carry.r,v.carry.a);v.carry=null}v.job=null;v.tx=null;if(b)reslot(b)}renderSheet();break}
     case 'openv':{const v=S.vill.find(x=>x.id===+p);if(v){openSheet('v',v.id);centerOn(Math.floor(v.x),Math.floor(v.y))}break}
     case 'dlg':if(dlgQ){dlgQ.shift();showDlg()}return;
@@ -2355,7 +2363,7 @@ addEventListener('pagehide',save);
 if(!load())newGame();
 setupTerrain();lastSea=seasonIdx();initWx();
 cam.z=Math.max(ZMIN,Math.min(ZMAX,innerWidth/(11*T)));
-resize();centerOn(21,21);
+resize();centerOn(S.buildings[0]?S.buildings[0].x:CX,S.buildings[0]?S.buildings[0].y:CY);
 catchUp(!!S.hero);
 if(!S.hero)modal(heroPicker(false));
 checkGoals();lastLv=lvInfo().L;updateUI();
