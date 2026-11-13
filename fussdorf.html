@@ -157,6 +157,7 @@ const B={
   solar:{n:'Solarpark',i:'☀️',roof:'#2a4a7a',fw:2,fh:2,cost:{iron:80,tools:30,gold:400},req:'solar',desc:'🚀 Zukunft (2×2): Sauberer Strom ohne Brennstoff und ohne Arbeiter – 6 Betriebe pro Stufe (im Winter weniger).'},
   robots:{n:'Roboterfabrik',i:'🤖',roof:'#3a6a8a',fw:2,fh:2,cost:{iron:120,tools:60,gold:600,diamond:3},slots:2,req:'robotics',desc:'🚀 Zukunft (2×2): Roboter helfen überall mit – +8 % Produktion pro Stufe in allen Betrieben (max. +40 %). Verbraucht etwas Eisen.'},
   vfarm:{n:'Vertikalfarm',i:'🥬',roof:'#2e7d5a',cost:{iron:40,tools:15,gold:200},slots:3,prod:{food:.45},req:'vfarming',desc:'🚀 Zukunft: Gemüse wächst in Etagen unter Licht – das ganze Jahr, auch im Winter.'},
+  firestation:{n:'Feuerwache',i:'🚒',roof:'#b02a2a',cost:{wood:40,stone:40,planks:20},slots:3,cover:7,req:'firefighting',desc:'Feuerwehrleute löschen Brände im Umkreis von 7 Feldern (+2 pro Stufe) in Sekunden. Ohne Feuerwehr löschen die Bewohner nur langsam mit Eimern – oft brennt das Gebäude dann eine Stufe herunter.'},
   dump:{n:'Müllplatz',i:'🚛',roof:'#5a6a3a',cost:{wood:40,stone:30,planks:15},slots:2,desc:'Müllmänner sammeln den Müll im Dorf ein und lagern ihn auf der Halde (400 pro Stufe, eigenes Lager). Auf der Halde verrotten 25 Müll pro Min. und Stufe. Ab ca. 15 Einwohnern entsteht Müll – liegt er herum, sinkt die Zufriedenheit. Mit „Müllverbrennung“ heizt der Müll dein Kraftwerk.'},
   rodel:{n:'Rodelbahn & Kletterpark',i:'🛷',roof:'#8fb0c4',fw:2,fh:3,cost:{wood:40,planks:15},joy:1,wjoy:10,sj:[8,8,7,10],sn:['🧗 Kletterpark','🧗 Kletterpark','🧗 Kletterpark','🛷 Rodelbahn'],desc:'Großer Hang (2×3 Felder): Im Winter 🛷 Rodelbahn (+10 Freude pro Stufe), von Frühling bis Herbst 🧗 Kletterpark mit Seilen zwischen den Bäumen (+7–8 Freude pro Stufe).'},
   skate:{n:'Eisbahn & Freibad',i:'⛸️',roof:'#6f9fc0',fw:3,fh:2,cost:{stone:30,planks:20,gold:20},joy:1,wjoy:12,sj:[5,12,3,12],sn:['🏊 Freibad','🏊 Freibad','🏊 Freibad (Nebensaison)','⛸️ Eisbahn'],desc:'Große Fläche (3×2 Felder): Im Winter ⛸️ Eisbahn (+12 Freude pro Stufe), im Sommer 🏊 Freibad (+12), im Frühling +5, im Herbst +3.'},
@@ -197,6 +198,7 @@ Object.assign(R,{
   solar:{n:'Solartechnik',i:'☀️',ep:3,cost:{research:600,gold:800},need:['electricity'],desc:'Schaltet den Solarpark frei.'},
   robotics:{n:'Robotik',i:'🤖',ep:3,cost:{research:800,gold:1000,tools:50},need:['industry'],desc:'Schaltet die Roboterfabrik frei.'},
   vfarming:{n:'Vertical Farming',i:'🥬',ep:3,cost:{research:500,gold:600},need:['agri2'],desc:'Schaltet die Vertikalfarm frei.'},
+  firefighting:{n:'Brandschutz',i:'🚒',cost:{research:40,gold:20},desc:'Schaltet die Feuerwache frei.'},
   herbs:{n:'Kräuterkunde',i:'🌿',cost:{research:30,gold:10},desc:'Schaltet die Kräuterhütte frei.'},
   medicine:{n:'Medizin',i:'💊',cost:{research:160,gold:150},need:['schooling','herbs'],desc:'Schaltet das Krankenhaus frei.'},
   hunting:{n:'Jagd',i:'🏹',cost:{research:25,gold:10},desc:'Schaltet die Jägerhütte frei.'},
@@ -503,6 +505,40 @@ function exploreLoot(v,live){
   if(live)toast(`🗺️ ${v.name} ist von der Erkundung zurück: ${txt}${got.diamond?' – ein Diamant! 💎':''}`);
 }
 
+// ======================= FEUER =======================
+const FIRE_RISK={bakery:3,toolsmith:3,smelter:3,sawmill:2,tavern:2,power:2.5,factory:3,coalmine:2,woodcutter:1.5,house:1,storage:1.2,storage2:1.2,storage3:1,farm:1.2,mill:1.5,cinema:1.5,butcher:1.5,hunter:1.2};
+const FIRE_DMG=90;
+function fireCover(b){const cx=b.x+fpW(b.type)/2,cy=b.y+fpH(b.type)/2;let best=null,bd=1e9;for(const s of S.buildings){if(s.type!=='firestation'||isSite(s)||!wcount(s))continue;const d=Math.hypot(s.x+.5-cx,s.y+.5-cy);if(d<=B.firestation.cover+2*(s.level-1)+.5&&d<bd){bd=d;best=s}}return best}
+function fireRiskOf(b){let r=FIRE_RISK[b.type]||(B[b.type].slots?1:0);if(!r)return 0;if(b.type==='house'&&b.level>3)r*=Math.max(.3,1-.12*(b.level-3)*(EP()+1));if(EP()>=2)r*=.6;return r}
+function fireTick(dt,live){
+  const burning=S.buildings.filter(b=>b.fire>0);
+  if(live&&S.vill.length>=20){const sf=[1,1.3,1,1.5][seasonIdx()];for(const b of S.buildings){if(b.fire||isSite(b))continue;const r=fireRiskOf(b);if(r&&Math.random()<.000012*r*sf*dt){b.fire=.01;b.fx=0;toast(`🔥 Feuer! ${B[b.type].i} ${B[b.type].n} brennt${fireCover(b)?' – die Feuerwehr rückt aus! 🚒':' – die Bewohner löschen mit Eimern. Eine 🚒 Feuerwache wäre schneller!'}`);S.fires=(S.fires||0)+1}}}
+  for(const b of burning){
+    b.fire+=dt;const st=fireCover(b),wells=S.buildings.filter(w=>(w.type==='fountain'||w.type==='well')&&!isSite(w)&&Math.hypot(w.x-b.x,w.y-b.y)<5).length;
+    let rate=.007+.006*Math.min(3,wells);if(st)rate+=.035*wcount(st)*(1+.3*(st.level-1));
+    if(b.ft==null)b.ft=st?st.id:null;
+    b.fx+=rate*dt;
+    if(b.fx>=1){b.fire=0;b.fx=0;b.ft=null;if(live)toast(`🧯 ${B[b.type].i} ${B[b.type].n} ist gelöscht!${st?' Gut gemacht, Feuerwehr! 🚒':''}`);continue}
+    if(b.fire>=30&&Math.random()<.012*dt){const nb=S.buildings.find(o=>o!==b&&!o.fire&&!isSite(o)&&fireRiskOf(o)&&Math.abs(o.x-b.x)<=fpW(b.type)&&Math.abs(o.y-b.y)<=fpH(b.type));if(nb){nb.fire=.01;nb.fx=0;if(live)toast(`🔥 Das Feuer greift auf ${B[nb.type].i} ${B[nb.type].n} über!`)}}
+    if(b.fire>=FIRE_DMG){b.fire=0;b.fx=0;b.ft=null;S.burnt=(S.burnt||0)+1;
+      if(b.level>1){b.level--;if(live)toast(`💥 ${B[b.type].i} ${B[b.type].n} ist abgebrannt und verliert eine Stufe (jetzt Stufe ${b.level}).`)}
+      else{const bt=buildTime(B[b.type].cost);b.cs=bt*.5;b.ct=bt*.5;b.qs=Date.now();if(live)toast(`💥 ${B[b.type].i} ${B[b.type].n} ist abgebrannt und muss wieder aufgebaut werden.`)}}
+  }
+}
+function drawFires(){const t=performance.now()/1000;let trucks=0;
+  for(const b of S.buildings){if(!(b.fire>0))continue;const w=fpW(b.type)*T,h=fpH(b.type)*T,px=b.x*T,py=b.y*T;
+    const g=ctx.createRadialGradient(px+w/2,py+h/2,2,px+w/2,py+h/2,Math.max(w,h)*.9);g.addColorStop(0,'rgba(255,140,40,.45)');g.addColorStop(1,'rgba(255,60,0,0)');ctx.fillStyle=g;ctx.fillRect(px-w*.4,py-h*.4,w*1.8,h*1.8);
+    for(let k=0;k<5;k++){const f=(t*.6+k/5)%1;ctx.fillStyle=`rgba(70,70,70,${.45*(1-f)})`;ctx.beginPath();ctx.arc(px+w*(.3+.1*k)+Math.sin(t+k)*3,py-f*T*1.3,3+f*7,0,7);ctx.fill()}
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#000';const n=Math.max(2,Math.round(3*(1-b.fx)));
+    for(let k=0;k<n;k++){const fx=px+w*(.2+.6*((k*.37+.1)%1)),fy=py+h*(.25+.5*((k*.61+.2)%1)),sc=.8+.3*Math.sin(t*9+k*2);ctx.font=`${T*.6*sc}px sans-serif`;ctx.fillText("🔥",fx,fy-Math.abs(Math.sin(t*6+k))*2)}
+    ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(px+w/2-T/2,py+h+2,T,4);ctx.fillStyle='#4aa3d8';ctx.fillRect(px+w/2-T/2+1,py+h+3,(T-2)*b.fx,2);
+    const st=fireCover(b);if(st){const sx=(st.x+.5)*T,sy=(st.y+.5)*T,tx=px+w/2,ty=py+h+T*.3,pr=Math.min(1,b.fire/4),x=sx+(tx-sx)*pr,y=sy+(ty-sy)*pr;
+      ctx.font=`${T*.5}px sans-serif`;ctx.fillText(EP()>=1?'🚒':'🧑‍🚒',x,y);
+      if(pr>=1){ctx.strokeStyle='rgba(120,190,255,.8)';ctx.lineWidth=2;ctx.setLineDash([3,2]);ctx.beginPath();ctx.moveTo(x,y-4);ctx.quadraticCurveTo((x+tx)/2,py-6,px+w/2+Math.sin(t*3)*6,py+h/2);ctx.stroke();ctx.setLineDash([]);
+        for(let k=0;k<6;k++){const f=(t*2+k/6)%1;ctx.fillStyle=`rgba(150,210,255,${1-f})`;ctx.beginPath();ctx.arc(px+w/2+Math.sin(k*2.1)*w*.3*f,py+h/2+Math.cos(k*1.7)*h*.3*f,1.5,0,7);ctx.fill()}}}
+    else{for(let k=0;k<3;k++){const a=t*1.5+k*2.1,x=px+w/2+Math.cos(a)*w*.75,y=py+h/2+Math.sin(a)*h*.75;drawPerson(x,y,FUNC[k]);ctx.font='7px sans-serif';ctx.fillText('🪣',x+3,y-3)}}}
+}
+
 // ======================= EPOCHEN =======================
 const EPOCHS=[
  {n:'Mittelalter',i:'🏰',desc:'Holz, Stein und Handwerk – hier hat alles begonnen.'},
@@ -740,7 +776,7 @@ function econ(dt,apply){
    PWR=dem?Math.min(1,sup/dem):0;PWR_S=sup;PWR_D=dem;
    VEH=S.buildings.some(b=>b.type==='garage'&&!isSite(b)&&(cnt[b.id]||0)>0&&S.res.tools>.5)}
   for(const b of S.buildings){
-    const def=B[b.type],w=cnt[b.id]||0;if(!w||isSite(b))continue;
+    const def=B[b.type],w=cnt[b.id]||0;if(!w||isSite(b)||b.fire)continue;
     const e=eff(b);if(!e)continue;
     const f=(pw[b.id]||w)*e*hf*(def.wild?wildF():1);
     if(def.rare){for(const r in def.prod){const ev=def.prod[r]*mult(b,r)*f*dt;if(!apply){add(r,ev);continue}let n=Math.floor(ev);if(Math.random()<ev-n)n++;if(n){add(r,n);if(liveTick)DFOUND+=n}}}
@@ -796,6 +832,7 @@ function tick(dt,live){
   fairTick(dt,live);
   routeTick(dt,live);
   epochTick(dt);
+  fireTick(dt,live);
   if(live)advisorTick(dt);
   moodTick(dt,live);
   bankTick(dt,live);
@@ -1564,6 +1601,7 @@ function thought(v){
   if(seasonIdx()===3&&S.buildings.some(b=>b.type==='rodel'&&!isSite(b)))o.push('Ab auf die Rodelbahn! 🛷','Wer ist schneller unten? 🛷');
   if(seasonIdx()===3&&S.buildings.some(b=>b.type==='skate'&&!isSite(b)))o.push('Eislaufen macht so Spaß! ⛸️','Ich drehe noch eine Runde ⛸️');
   if(fairOn()&&Math.random()<.5)return pickA(['Auf zum Riesenrad! 🎡','Noch eine Runde Autoscooter! 🚗','Zuckerwatte! 🍭','Ich hab beim Dosenwerfen gewonnen! 🎯','Was für ein Rummel! 🎠']);
+  if(S.buildings.some(b=>b.fire>0)&&Math.random()<.5)return pickA(['Feuer! Feuer! 🔥','Schnell, holt Wasser! 🪣','Hoffentlich kommt die Feuerwehr! 🚒']);
   if(fw)return pickA(['Frohes neues Jahr! 🎆','Prost Neujahr! 🥂','Wie schön das funkelt! ✨','Ohhh! 🎇','Aaah! 🎆']);
   if(!v.job&&festOn())o.push('Was für ein Fest! 🎉','Musik und Tanz! 💃','Noch ein Stück Kuchen? 🍰');
   if(v.job&&v.job.t==='i')o.push('Was mag hier verborgen sein? 🔍','Ein seltsamer Ort …');
@@ -1637,7 +1675,7 @@ function render(dt){
     const d=B[placing.type];
     if(placing.x!=null){
       const ok=validPlace(placing.x,placing.y);
-      if(d.near!=null){ctx.fillStyle='rgba(255,255,255,.12)';ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=1.5/cam.z;ctx.beginPath();ctx.arc((placing.x+.5)*T,(placing.y+.5)*T,(d.r+.5)*T,0,7);ctx.fill();ctx.stroke()}
+      if(d.near!=null||d.cover){ctx.fillStyle=d.cover?'rgba(255,90,60,.1)':'rgba(255,255,255,.12)';ctx.strokeStyle=d.cover?'rgba(255,120,80,.8)':'rgba(255,255,255,.6)';ctx.lineWidth=1.5/cam.z;ctx.beginPath();ctx.arc((placing.x+.5)*T,(placing.y+.5)*T,((d.cover||d.r)+.5)*T,0,7);ctx.fill();ctx.stroke()}
       ctx.fillStyle=ok?'rgba(120,255,120,.45)':'rgba(255,80,80,.5)';ctx.fillRect(placing.x*T,placing.y*T,T*fpW(placing.type),T*fpH(placing.type));
       ctx.font=`${T*.55}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.globalAlpha=.85;ctx.fillText(d.i,(placing.x+fpW(placing.type)/2)*T,(placing.y+fpH(placing.type)/2)*T);ctx.globalAlpha=1;
     }
@@ -1648,8 +1686,9 @@ function render(dt){
   drawWild();
   drawFair();
   drawCaravans();
-  drawGroup();
   for(const b of S.buildings)if(vis(b.x,b.y)||(B[b.type].fw&&vis(b.x+fpW(b.type)-1,b.y+fpH(b.type)-1))){if(placing&&placing.move===b.id)ctx.globalAlpha=.35;drawBuilding(b,cnt);if(b.type==='house'&&DLV>.12&&!isSite(b))drawBags(b);ctx.globalAlpha=1;if(demoMode&&demoTarget&&demoTarget.k==='b'&&demoTarget.id===b.id){ctx.fillStyle='rgba(255,60,40,.45)';ctx.fillRect(b.x*T,b.y*T,T*fpW(b.type),T*fpH(b.type));ctx.font=`${T*.5}px sans-serif`;ctx.fillText('❌',(b.x+fpW(b.type)/2)*T,(b.y+fpH(b.type)/2)*T)}}
+  drawFires();
+  drawGroup();
   const vs=S.vill.filter(v=>vis(v.x,v.y)).sort((a,b)=>a.y-b.y);
   for(const v of vs)if(!v.asleep&&!v.inH&&!(v.job&&v.job.t==='x'))drawV(v);
   drawHero();
@@ -1861,6 +1900,7 @@ function sheetVillage(){
    if(kids)h+=row('🏫','Bildung',seats/kids,`${seats} Schulplätze / ${kids} Kinder`);
    h+=row('🏥','Gesundheit',sickN()?Math.min(1,hos/Math.max(1,sickN())):1,`${hos} Betten · ${sickN()} krank`);
    if(gen>0)h+=row('🗑️','Müllabfuhr',col/gen,`${f1(col*60)} / ${f1(gen*60)} pro Min.`);
+   {const rb=S.buildings.filter(b=>!isSite(b)&&fireRiskOf(b)),cv=rb.filter(b=>fireCover(b)).length;if(rb.length)h+=row('🚒','Brandschutz',cv/rb.length,`${cv} / ${rb.length} Gebäude geschützt`)}
    h+=row('👷','Arbeitsplätze',slotsT/ad,`${slotsT} Plätze / ${ad} Erw.`);
    h+=`</div>`}
   h+=`<div class="item" data-act="nav:epoch" style="display:block;padding:7px 10px"><b>🕰️ Epoche: ${EPOCHS[EP()].i} ${EPOCHS[EP()].n}</b>${epochCheck()?`<small>Nächste: ${EPOCHS[EP()+1].i} ${EPOCHS[EP()+1].n}${epochCheck().ok?' – <b style="color:#4f8a2b">bereit!</b>':''} · antippen für Details</small>`:''}</div>`;
@@ -1927,6 +1967,8 @@ function advice(){
   const A=[],rt=econ(60,false),ad=adults(),pop=S.vill.length,fr=freeV().length,bl=t=>S.buildings.filter(b=>b.type===t&&!isSite(b));
   const freeSlots=t=>bl(t).reduce((a,b)=>a+Math.max(0,slots(b)-wcount(b)),0),first=t=>bl(t).find(b=>slots(b)>wcount(b))||bl(t)[0];
   const add=(lv,i,t,tip,act,lbl,key)=>A.push({lv,i,t,tip,act,lbl,key:key||t});
+  {const fb=S.buildings.filter(b=>b.fire>0);if(fb.length)add(3,'🔥',`${fb.length} Gebäude brenn${fb.length>1?'en':'t'}!`,fireCover(fb[0])?'Die Feuerwehr ist unterwegs.':S.tech.firefighting?'Baue eine 🚒 Feuerwache in der Nähe und stelle Feuerwehrleute ein!':'Erforsche 🚒 Brandschutz, um eine Feuerwache bauen zu können.','ob:'+fb[0].id,'🔥 Hinschauen','fire');
+   const rb=S.buildings.filter(b=>!isSite(b)&&fireRiskOf(b)),cv=rb.filter(b=>fireCover(b)).length;if(S.vill.length>=20&&rb.length>5&&cv/rb.length<.6)add((S.fires||0)>0?1:0,'🚒',`Nur ${Math.round(cv/rb.length*100)} % der Gebäude sind vor Feuer geschützt`,S.tech.firefighting?'Baue weitere 🚒 Feuerwachen – jede schützt alles im Umkreis von 7 Feldern.':'Erforsche 🚒 Brandschutz (günstig) und baue eine Feuerwache.',S.tech.firefighting?'nav:build':'nav:research',S.tech.firefighting?'🔨 Bauen':'🔬 Forschung','firecov')}
   // Nahrung
   const fr_=rt.food||0,fd=S.res.food;
   if(fd<=.001||(fr_<0&&fd/(-fr_)<4)){
@@ -2035,6 +2077,9 @@ function sheetBuilding(b){
   if(d.joy&&!SEATS[b.type])h+=`<p>🎉 Freude: <b>+${joyOf(d)*b.level}</b>${d.sj?` · jetzt: <b>${d.sn[seasonIdx()]}</b><br><small>${['🌸','☀️','🍂','❄️'].map((x,i)=>x+' +'+d.sj[i]*b.level).join(' · ')}</small>`:''}</p>`;
   if(d.store)h+=`<p>📥 Abgabestelle für Sammler</p>`;
   if(b.type==='tradepost'&&!isSite(b)){const on=(S.routes||[]).filter(r=>r.on).length;h+=`<p>🐴 ${(S.routes||[]).length}/${routeMax()} Routen · ${on} aktiv · Ladung bis ${routeCap()}</p><button class="big" data-act="nav:routes">🐴 Handelsrouten verwalten</button>`}
+  if(b.fire>0)h+=`<div class="item" style="display:block;border:2px solid #c0392b"><b>🔥 Es brennt!</b>${bar('Gelöscht',b.fx)}<small>${fireCover(b)?'🚒 Die Feuerwehr ist im Einsatz.':'🪣 Die Bewohner löschen mit Eimern – das dauert. Brennt es zu lange, verliert das Gebäude eine Stufe.'}</small></div>`;
+  if(b.type==='firestation'&&!isSite(b)){const r=B.firestation.cover+2*(b.level-1),n=S.buildings.filter(o=>fireRiskOf(o)&&Math.hypot(b.x+.5-(o.x+fpW(o.type)/2),b.y+.5-(o.y+fpH(o.type)/2))<=r+.5).length;h+=`<p>🚒 Reichweite: <b>${r} Felder</b> · schützt ${n} Gebäude${wcount(b)?'':' – <b style="color:#c0392b">keine Feuerwehrleute!</b>'}</p>`}
+  else if(fireRiskOf(b)&&!isSite(b))h+=`<p>🧯 Brandschutz: ${fireCover(b)?'✅ Feuerwache in Reichweite':'⚠️ keine Feuerwache in Reichweite'}</p>`;
   if(b.type==='hospital'&&!isSite(b)){const inH=S.vill.filter(v=>v.sick>0&&v.hosp===b.id);h+=`<p>🛏️ Betten: <b>${inH.length}/${hospBeds(b)}</b> belegt${hospBeds(b)?'':' – stelle Ärzte ein!'}</p>`+(inH.length?`<p class="desc">${inH.map(v=>v.name).join(', ')}</p>`:'')}
   if(b.type==='herbs'&&!isSite(b))h+=`<p>🤒 ${sickN()} Kranke im Dorf</p>`;
   if(d.wild){const wf=wildF();h+=bar('🦌 Wildbestand',wf)+`<p class="desc">${wf<.3?'⚠️ Das Wild wird knapp – weniger jagen, damit es sich erholt!':wf<.6?'Der Bestand sinkt. Achte auf nachhaltige Jagd.':'Der Wald ist voller Wild.'} Im Winter vermehrt es sich langsamer. Mehr Wald = mehr Wild.</p>`}
