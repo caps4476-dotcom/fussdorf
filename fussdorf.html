@@ -360,7 +360,7 @@ function darkness(){const p=(S.gt%DAY)/DAY;if(p<.6)return 0;if(p<.7)return (p-.6
 const isNight=()=>darkness()>.35;
 const JCAT={food:{n:'Gastronomie',i:'🍺'},calm:{n:'Natur & Ruhe',i:'🌳'},culture:{n:'Markt & Kultur',i:'🛍️'},sport:{n:'Sport & Spiel',i:'⚽'}};
 const SEATS={tavern:['food',20],flowerbed:['calm',5],fountain:['calm',12],monument:['calm',40],market:['culture',30],jeweler:['culture',15],rodel:['sport',35],skate:['sport',40],park:['calm',60],cinema:['culture',50],supermarket:['food',40]};
-function seatsOf(b){const sp=SEATS[b.type];if(!sp||isSite(b))return 0;const d=B[b.type];let n=sp[1]*b.level;if(d.sj)n*=d.sj[seasonIdx()]/Math.max(...d.sj);return Math.round(n)}
+function seatsOf(b){const sp=SEATS[b.type];if(!sp||isSite(b))return 0;const d=B[b.type];let n=sp[1]*b.level;if(inDist(b))n*=1.2;if(d.sj)n*=d.sj[seasonIdx()]/Math.max(...d.sj);return Math.round(n)}
 function joyCalc(){const pop=Math.max(1,S.vill.length),cat={food:0,calm:0,culture:0,sport:0};for(const b of S.buildings){const sp=SEATS[b.type];if(sp)cat[sp[0]]+=seatsOf(b)}
   const tot=Object.values(cat).reduce((a,b)=>a+b,0),cov=Math.min(1,tot/pop),vf={};let vs=0;for(const k in cat){vf[k]=Math.min(1,cat[k]/(pop*.15));vs+=vf[k]}const variety=vs/4;
   return {cat,tot,pop,cov,vf,variety,base:cov*(.55+.45*variety)}}
@@ -370,7 +370,7 @@ function happy(){
   const home=(hs.length?Math.min(1,.3+.175*hs.reduce((a,b)=>a+b.level,0)/hs.length):.3)*Math.min(1,popCap()/Math.max(1,adults()));
   const J=joyCalc();
   const joy=Math.min(1,J.base*(S.hero&&S.hero.c==='lyonessa'?1.5:1)+(seasonIdx()===3?.03:0)+(adults()>=6?.05*(S.sec==null?1:S.sec):0)+(festOn()?.4:0)+(fairOn()?.3:0));
-  return {food,home,joy,total:Math.max(0,Math.min(1,.4*food+.3*home+.3*joy-taxPen()-.25*dirtLvl()+(S.res.meat>1?.06:0)-.4*sickN()/Math.max(1,adults())))};
+  return {food,home,joy,total:Math.max(0,Math.min(1,.4*food+.3*home+.3*joy-taxPen()-.25*dirtLvl()+(S.res.meat>1?.06:0)-.4*sickN()/Math.max(1,adults())+.08*distStats().home-.12*distStats().loud))};
 }
 const needXP=L=>Math.round(30*Math.pow(L,1.5));
 function lvInfo(){let L=1,x=S.xp;while(x>=needXP(L)){x-=needXP(L);L++}return{L,x,n:needXP(L)}}
@@ -429,7 +429,7 @@ function newGame(){
   S.tiles=genMap(seed);
   S.amt=S.tiles.map(t=>NODE[t]?NODE[t].max:0);
   S.rt=S.tiles.map(()=>0);
-  S.road=S.tiles.map(()=>0);
+  S.road=S.tiles.map(()=>0);S.dist=S.tiles.map(()=>0);
   S.mkt={};for(const r in PRICE)S.mkt[r]={f:1,t:1};S.lastDay=1;S.bank={sav:0,fixed:[],loan:0};
   S.buildings.push({id:S.nid++,type:'camp',x:21,y:21,level:1});
   spawnV(21.2,22.2); spawnV(21.9,22.3);
@@ -443,7 +443,7 @@ function serialize(){
 }
 function save(){try{localStorage.setItem(KEY,serialize())}catch(e){}}
 function valid(o){return o&&o.v===1&&Array.isArray(o.tiles)&&o.tiles.length===W*H&&Array.isArray(o.buildings)}
-function adopt(o){S=o;S.flags=S.flags||{};S.made=S.made||{};S.tech=S.tech||{};if(S.gt==null)S.gt=90;if(S.tv!==2){S.gt*=6;S.tv=2}if(!Array.isArray(S.road)||S.road.length!==W*H)S.road=S.tiles.map(()=>0);
+function adopt(o){S=o;if(!Array.isArray(o.dist)||o.dist.length!==W*H)o.dist=o.tiles.map(()=>0);S.flags=S.flags||{};S.made=S.made||{};S.tech=S.tech||{};if(S.gt==null)S.gt=90;if(S.tv!==2){S.gt*=6;S.tv=2}if(!Array.isArray(S.road)||S.road.length!==W*H)S.road=S.tiles.map(()=>0);
   if(!S.bank)S.bank={sav:0,fixed:[],loan:0};
   if(!S.mkt)S.mkt={};for(const r in PRICE)if(!S.mkt[r])S.mkt[r]={f:1,t:1};if(S.lastDay==null)S.lastDay=dayNo();
   if(!S.story)S.story={ch:0,on:0,st:0,pages:[],mk:{},nt:-1};
@@ -504,6 +504,24 @@ function exploreLoot(v,live){
   const I=idleCfg();I.log.unshift(`🗺️ ${v.name} kam zurück: ${txt}`);I.log=I.log.slice(0,5);
   if(live)toast(`🗺️ ${v.name} ist von der Erkundung zurück: ${txt}${got.diamond?' – ein Diamant! 💎':''}`);
 }
+
+// ======================= BEZIRKE =======================
+const DIST=[null,{n:'Wohnen',i:'🏠',c:'#4aa3d8',types:['house','apartment']},
+ {n:'Gewerbe',i:'🛍️',c:'#e0a526',types:['market','stall','tavern','bakery','butcher','jeweler','cinema','supermarket','bank','tradepost','scholar']},
+ {n:'Industrie',i:'🏭',c:'#9a5a4a',types:['sawmill','smelter','toolsmith','factory','coalmine','quarry','mine','power','dump','diamondmine','woodcutter','robots','storage','storage2','storage3']},
+ {n:'Landwirtschaft',i:'🌾',c:'#6fae3a',types:['farm','ranch','mill','fisher','gatherer','hunter','vfarm']}];
+const LOUD=['smelter','toolsmith','factory','coalmine','power','dump','sawmill','quarry','mine'];
+const distAt=(x,y)=>S.dist&&inMap(x,y)?S.dist[x+y*W]:0;
+function distOf(t){for(let k=1;k<DIST.length;k++)if(DIST[k].types.includes(t))return k;return 0}
+function inDist(b){const k=distOf(b.type);if(!k)return false;let n=0,tot=0;for(let y=b.y;y<b.y+fpH(b.type);y++)for(let x=b.x;x<b.x+fpW(b.type);x++){tot++;if(distAt(x,y)===k)n++}return n*2>=tot}
+function nearLoud(b){return S.buildings.some(o=>LOUD.includes(o.type)&&!isSite(o)&&Math.abs(o.x+fpW(o.type)/2-(b.x+.5))<=2.6&&Math.abs(o.y+fpH(o.type)/2-(b.y+.5))<=2.6)}
+let DSTAT_T=-1e9,DSTAT={home:0,loud:0,hs:0};
+function distStats(){const now=performance.now();if(now-DSTAT_T<2000)return DSTAT;DSTAT_T=now;const hs=S.buildings.filter(b=>B[b.type].house&&!isSite(b)&&b.type!=='camp');let ih=0,ld=0;for(const b of hs){if(inDist(b))ih++;if(nearLoud(b))ld++}DSTAT={hs:hs.length,home:hs.length?ih/hs.length:0,loud:hs.length?ld/hs.length:0};return DSTAT}
+function distBanner(){if(!distMode)return '';return DIST.map((d,k)=>`<button class="sm" style="margin:1px;padding:3px 6px;${distMode.k===k?'outline:3px solid #3a2c1a;':''}background:${d?d.c:'#8a7a6a'}" data-act="dpick:${k}">${d?d.i:'🧽'}</button>`).join('')+`<button class="sm" style="margin:1px;padding:3px 6px;background:#5a4a3a" data-act="dbrush">${distMode.br===1?'▪️ 1×1':'⬛ 3×3'}</button>`}
+function drawDist(){if(!S.dist)return;const strong=!!distMode;if(!strong&&!S.showDist)return;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const k=S.dist[x+y*W];if(!k)continue;ctx.fillStyle=DIST[k].c;ctx.globalAlpha=strong?.38:.18;ctx.fillRect(x*T,y*T,T,T);
+    ctx.globalAlpha=strong?.9:.5;ctx.strokeStyle=DIST[k].c;ctx.lineWidth=1.5/cam.z;ctx.beginPath();if(distAt(x,y-1)!==k){ctx.moveTo(x*T,y*T);ctx.lineTo(x*T+T,y*T)}if(distAt(x,y+1)!==k){ctx.moveTo(x*T,y*T+T);ctx.lineTo(x*T+T,y*T+T)}if(distAt(x-1,y)!==k){ctx.moveTo(x*T,y*T);ctx.lineTo(x*T,y*T+T)}if(distAt(x+1,y)!==k){ctx.moveTo(x*T+T,y*T);ctx.lineTo(x*T+T,y*T+T)}ctx.stroke()}
+  ctx.globalAlpha=1}
 
 // ======================= FEUER =======================
 const FIRE_RISK={bakery:3,toolsmith:3,smelter:3,sawmill:2,tavern:2,power:2.5,factory:3,coalmine:2,woodcutter:1.5,house:1,storage:1.2,storage2:1.2,storage3:1,farm:1.2,mill:1.5,cinema:1.5,butcher:1.5,hunter:1.2};
@@ -764,7 +782,7 @@ const slots=b=>B[b.type].slots?B[b.type].slots+(b.level-1):0;
 function countNear(x,y,t,r){let n=0;for(let yy=y-r;yy<=y+r;yy++)for(let xx=x-r;xx<=x+r;xx++){if(inMap(xx,yy)&&S.tiles[xx+yy*W]===t&&Math.hypot(xx-x,yy-y)<=r+.5)n++}return n}
 function effAt(type,x,y){const d=B[type];if(d.near==null)return 1;const n=countNear(x,y,d.near,d.r);return n===0?0:Math.min(1,.4+n*.15)}
 const eff=b=>effAt(b.type,b.x,b.y);
-function mult(b,r){let m=1+.5*(b.level-1);if(S.tech.tools1&&(r==='wood'||r==='stone'))m*=1.2;if(S.tech.tools2)m*=1.3;if(S.tech.tools3)m*=1.25;if(S.tech.diamondtools)m*=1.2;if(S.tech.gemcraft2){if(r==='diamond')m*=1.5;if(r==='stone'||r==='ore')m*=1.15}if(hasRoad(b))m*=1.1;if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))m*=1+.25*PWR;if(S.story&&S.story.bless)m*=1.15;const hc=S.hero&&S.hero.c;if(hc==='thordis'&&r==='wood')m*=1.1;if(hc==='elmiran'&&r==='food')m*=1.15;if(hc==='zara'&&r==='research')m*=1.25;if(S.tech.agri2&&(r==='food'||r==='grain'))m*=1.25;if(S.tech.mining2&&(r==='stone'||r==='ore'))m*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))m*=1.15;m*=1+.1*(S.epoch||0);m*=1+ROBO;m*=.8+.4*happy().total;if(B[b.type].season&&(r==='food'||r==='grain'))m*=SEAS[seasonIdx()].food;return m}
+function mult(b,r){let m=1+.5*(b.level-1);if(S.tech.tools1&&(r==='wood'||r==='stone'))m*=1.2;if(S.tech.tools2)m*=1.3;if(S.tech.tools3)m*=1.25;if(S.tech.diamondtools)m*=1.2;if(S.tech.gemcraft2){if(r==='diamond')m*=1.5;if(r==='stone'||r==='ore')m*=1.15}if(hasRoad(b))m*=1.1;if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))m*=1+.25*PWR;if(S.story&&S.story.bless)m*=1.15;const hc=S.hero&&S.hero.c;if(hc==='thordis'&&r==='wood')m*=1.1;if(hc==='elmiran'&&r==='food')m*=1.15;if(hc==='zara'&&r==='research')m*=1.25;if(S.tech.agri2&&(r==='food'||r==='grain'))m*=1.25;if(S.tech.mining2&&(r==='stone'||r==='ore'))m*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))m*=1.15;m*=1+.1*(S.epoch||0);m*=1+ROBO;if(inDist(b))m*=1.15;m*=.8+.4*happy().total;if(B[b.type].season&&(r==='food'||r==='grain'))m*=SEAS[seasonIdx()].food;return m}
 const hasRoad=b=>{const w=fpW(b.type),h=fpH(b.type);for(let y=b.y-1;y<=b.y+h;y++)for(let x=b.x-1;x<=b.x+w;x++){const ins=x>=b.x&&x<b.x+w&&y>=b.y&&y<b.y+h,cor=(x<b.x||x>=b.x+w)&&(y<b.y||y>=b.y+h);if(ins||cor||!inMap(x,y))continue;if(S.road[x+y*W])return true}return false};
 function cap(r){if(r==='research'||r==='gold'||r==='diamond')return Infinity;if(r==='trash'){let c=50;for(const b of S.buildings)if(b.type==='dump'&&!isSite(b))c+=DUMP_CAP*b.level;return c}let c=100;for(const b of S.buildings)if(B[b.type].cap&&!isSite(b))c+=B[b.type].cap*b.level;return c}
 function popCap(){let c=0;for(const b of S.buildings)c+=beds(b);return c}
@@ -1683,6 +1701,7 @@ function render(dt){
   const cnt=workerCounts();
   drawXmas();
   DLV=dirtLvl();
+  drawDist();
   drawWild();
   drawFair();
   drawCaravans();
@@ -1733,7 +1752,7 @@ function render(dt){
 }
 
 // ======================= EINGABE =======================
-const ptrs=new Map();let buildQ=[],multiSel=false,serialMode=false,gm=null,GM_IGN=null,tapStart=null,pinch=null,sel=null,placing=null,demoMode=false,demoTarget=null,roadMode=null,pathGen=0;
+const ptrs=new Map();let buildQ=[],multiSel=false,serialMode=false,distMode=null,gm=null,GM_IGN=null,tapStart=null,pinch=null,sel=null,placing=null,demoMode=false,demoTarget=null,roadMode=null,pathGen=0;
 function clampCam(){const vw=innerWidth/cam.z,vh=innerHeight/cam.z;cam.x=Math.max(-vw/2,Math.min(W*T-vw/2,cam.x));cam.y=Math.max(-vh/2,Math.min(H*T-vh/2,cam.y))}
 function pinchStart(){const p=[...ptrs.values()];const d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y)||1,mx=(p[0].x+p[1].x)/2,my=(p[0].y+p[1].y)/2;pinch={d0:d,z0:cam.z,wx:cam.x+mx/cam.z,wy:cam.y+my/cam.z}}
 cv.addEventListener('pointerdown',e=>{
@@ -1782,6 +1801,7 @@ function onTap(sx,sy){
   const tx=Math.floor((cam.x+sx/cam.z)/T),ty=Math.floor((cam.y+sy/cam.z)/T);
   if(!inMap(tx,ty))return;
   if(gm){if(gm.st==='sel'){const b=buildingAt(tx,ty);if(b){if(B[b.type].fixed){toast('Das Lagerfeuer bleibt, wo es ist');return}const i=gm.ids.indexOf(b.id);if(i>=0)gm.ids.splice(i,1);else gm.ids.push(b.id)}}else{gm.x=tx;gm.y=ty}updateBanner();return}
+  if(distMode){const r=distMode.br===3?1:0;for(let y=ty-r;y<=ty+r;y++)for(let x=tx-r;x<=tx+r;x++)if(inMap(x,y)&&S.zones[zoneOf(x,y)])S.dist[x+y*W]=distMode.k;DSTAT_T=-1e9;updateBanner();return}
   if(placing&&placing.ser){const sp=placing.ser,i=sp.findIndex(q=>tx>=q.x&&tx<q.x+fpW(placing.type)&&ty>=q.y&&ty<q.y+fpH(placing.type));
     if(i>=0)sp.splice(i,1);
     else{const w=fpW(placing.type),h=fpH(placing.type),ov=sp.some(q=>tx<q.x+w&&tx+w>q.x&&ty<q.y+h&&ty+h>q.y);
@@ -1846,7 +1866,7 @@ function renderSheet(){
 }
 function sheetBuild(){
   let h='<h3>🔨 Bauen</h3><div class="row" style="margin-bottom:8px"><button class="danger" data-act="roadmode" style="margin:0">🛣️ Wege bauen</button><button class="danger" data-act="demomode" style="margin:0">🗑️ Abriss-Modus</button></div><p class="desc" style="margin-bottom:8px">Wege: 1 🪨 pro Feld. Bewohner laufen darauf fast doppelt so schnell, Gebäude mit Weganschluss arbeiten +10 %. Der Abriss-Modus entfernt auch Wege, Bäume und Felsen.</p>';
-  h+=`<div class="row" style="margin-bottom:8px"><button class="sm" style="margin:0;${multiSel?'background:#4f8a2b':'background:#8a7a6a'}" data-act="msel">${multiSel?'☑️ Mehrfachauswahl AN':'☐ Mehrfachauswahl'}</button><button class="sm" style="margin:0" data-act="gmove">↔️ Mehrere verschieben</button></div><div class="row" style="margin:-2px 0 8px"><button class="sm" style="margin:0;${serialMode?'background:#4f8a2b':'background:#8a7a6a'}" data-act="sertog">${serialMode?'🔁 Serienbau AN – Gebäude antippen, dann beliebig viele Plätze markieren':'🔁 Serienbau: ein Gebäude mehrfach bauen'}</button></div>`;
+  h+=`<div class="row" style="margin-bottom:8px"><button class="sm" style="margin:0;${multiSel?'background:#4f8a2b':'background:#8a7a6a'}" data-act="msel">${multiSel?'☑️ Mehrfachauswahl AN':'☐ Mehrfachauswahl'}</button><button class="sm" style="margin:0" data-act="gmove">↔️ Mehrere verschieben</button></div><div class="row" style="margin:-2px 0 8px"><button class="sm" style="margin:0;background:#3a6a8a" data-act="dist">🏘️ Bezirke malen</button><button class="sm" style="margin:0;background:#8a7a6a" data-act="dshow">${S.showDist?'👁️ Bezirke ausblenden':'👁️ Bezirke anzeigen'}</button></div><div class="row" style="margin:-2px 0 8px"><button class="sm" style="margin:0;${serialMode?'background:#4f8a2b':'background:#8a7a6a'}" data-act="sertog">${serialMode?'🔁 Serienbau AN – Gebäude antippen, dann beliebig viele Plätze markieren':'🔁 Serienbau: ein Gebäude mehrfach bauen'}</button></div>`;
   if(multiSel){const cnt={};for(const t of buildQ)cnt[t]=(cnt[t]||0)+1;const qc=qCost(),ok=canPay(qc);
     h+=`<div class="item" style="display:block;border:2px solid #4f8a2b;padding:8px 10px"><b>🧺 Auswahl: ${buildQ.length} Gebäude</b>${buildQ.length?`<small>${Object.keys(cnt).map(t=>`${B[t].i} ${B[t].n} ×${cnt[t]}`).join(' · ')}</small><div class="cost">Gesamt: ${costHtml(qc)}${ok?'':' <b style="color:#c0392b">– reicht nicht für alle</b>'}</div><div class="row" style="gap:5px;margin-top:6px"><button class="sm" data-act="qstart">▶️ Nacheinander platzieren</button><button class="sm" style="background:#8a7a6a" data-act="qclr">Leeren</button></div>`:'<small>Tippe unten Gebäude an – auch mehrmals dasselbe. Danach platzierst du sie nacheinander auf der Karte.</small>'}</div>`}
   for(const k in B){const d=B[k];if(d.fixed)continue;const lk=d.req&&!S.tech[d.req],qn=buildQ.filter(t=>t===k).length;
@@ -1908,6 +1928,7 @@ function sheetVillage(){
    h+=row('🏥','Gesundheit',sickN()?Math.min(1,hos/Math.max(1,sickN())):1,`${hos} Betten · ${sickN()} krank`);
    if(gen>0)h+=row('🗑️','Müllabfuhr',col/gen,`${f1(col*60)} / ${f1(gen*60)} pro Min.`);
    {const rb=S.buildings.filter(b=>!isSite(b)&&fireRiskOf(b)),cv=rb.filter(b=>fireCover(b)).length;if(rb.length)h+=row('🚒','Brandschutz',cv/rb.length,`${cv} / ${rb.length} Gebäude geschützt`)}
+   {const prod=S.buildings.filter(b=>!isSite(b)&&distOf(b.type)),inn=prod.filter(inDist).length,ds=distStats();if(prod.length)h+=row('🏘️','Im passenden Bezirk',inn/prod.length,`${inn} / ${prod.length} Gebäude`);if(ds.hs)h+=row('🔇','Ruhige Wohnlage',1-ds.loud,`${Math.round((1-ds.loud)*100)} % der Häuser`)}
    h+=row('👷','Arbeitsplätze',slotsT/ad,`${slotsT} Plätze / ${ad} Erw.`);
    h+=`</div>`}
   h+=`<div class="item" data-act="nav:epoch" style="display:block;padding:7px 10px"><b>🕰️ Epoche: ${EPOCHS[EP()].i} ${EPOCHS[EP()].n}</b>${epochCheck()?`<small>Nächste: ${EPOCHS[EP()+1].i} ${EPOCHS[EP()+1].n}${epochCheck().ok?' – <b style="color:#4f8a2b">bereit!</b>':''} · antippen für Details</small>`:''}</div>`;
@@ -2008,6 +2029,8 @@ function advice(){
     if(weak.length)tip+=`Für Abwechslung fehlt: ${weak.map(k=>JCAT[k].i+' '+JCAT[k].n).join(', ')} – z. B. ${weak.map(k=>({food:'🍺 Taverne',calm:'⛲ Brunnen',culture:'🎪 Marktplatz',sport:'⛸️ Eisbahn & Freibad'})[k]).join(', ')}.`;
     add(J.cov<.4?2:1,'🎡',`Freizeit: ${Math.round(J.cov*100)} % versorgt, Abwechslung ${Math.round(J.variety*100)} %`,tip,'nav:build','🔨 Bauen','joy')}}
   {const c=epochCheck();if(c){const miss=c.it.filter(x=>!x.ok).length;if(!miss)add(1,'🕰️',`Bereit für die ${c.e.n}!`,`Alle Bedingungen sind erfüllt. Brich in eine neue Epoche auf: +10 % Produktion, neue Gebäude und ein neues Aussehen.`,'nav:epoch','🕰️ Epochen','epoch');else if(miss<=2)add(0,'🕰️',`Fast bereit für die ${c.e.n}`,`Es fehlt nur noch: ${c.it.filter(x=>!x.ok).map(x=>x.t).join(', ')}.`,'nav:epoch','🕰️ Epochen','epoch')}}
+  {const ds=distStats();if(ds.hs>=4&&ds.loud>.2)add(1,'🔊',`${Math.round(ds.loud*100)} % der Häuser stehen neben lauter Industrie`,'Schmelzen, Fabriken, Sägewerke & Co. machen Lärm und Dreck. Verschiebe sie in einen 🏭 Industrie-Bezirk etwas abseits der Wohnhäuser (mind. 3 Felder Abstand).','dist','🏘️ Bezirke malen','loud');
+   const prod=S.buildings.filter(b=>!isSite(b)&&distOf(b.type)&&!B[b.type].house),inn=prod.filter(inDist).length;if(prod.length>=6&&inn/prod.length<.3)add(0,'🏘️','Bezirke bringen +15 % Produktion',`Nur ${inn} von ${prod.length} Betrieben stehen im passenden Bezirk. Male Bezirke auf die Karte – Betriebe darin produzieren 15 % mehr.`,'dist','🏘️ Bezirke malen','distuse')}
   // Unbesetzte Betriebe
   {const empty=S.buildings.filter(b=>!isSite(b)&&B[b.type].slots&&!wcount(b)&&!['uni','garage','school'].includes(b.type));
    if(empty.length&&fr)add(1,'👷',`${empty.length} Betrieb${empty.length>1?'e':''} ohne Arbeiter`,`z. B. ${B[empty[0].type].i} ${B[empty[0].type].n}. Du hast ${fr} freie Bewohner – tippe das Gebäude an und füge Arbeiter hinzu.`,'ob:'+empty[0].id,'👷 Hinschauen','empty')}
@@ -2084,6 +2107,7 @@ function sheetBuilding(b){
   if(d.joy&&!SEATS[b.type])h+=`<p>🎉 Freude: <b>+${joyOf(d)*b.level}</b>${d.sj?` · jetzt: <b>${d.sn[seasonIdx()]}</b><br><small>${['🌸','☀️','🍂','❄️'].map((x,i)=>x+' +'+d.sj[i]*b.level).join(' · ')}</small>`:''}</p>`;
   if(d.store)h+=`<p>📥 Abgabestelle für Sammler</p>`;
   if(b.type==='tradepost'&&!isSite(b)){const on=(S.routes||[]).filter(r=>r.on).length;h+=`<p>🐴 ${(S.routes||[]).length}/${routeMax()} Routen · ${on} aktiv · Ladung bis ${routeCap()}</p><button class="big" data-act="nav:routes">🐴 Handelsrouten verwalten</button>`}
+  {const k=distOf(b.type);if(k&&!isSite(b))h+=`<p>🏘️ Bezirk: ${inDist(b)?`✅ im ${DIST[k].i} ${DIST[k].n}-Bezirk → ${b.type==='house'||b.type==='apartment'?'zufriedenere Bewohner':SEATS[b.type]?'+20 % Plätze, +15 % Produktion':'+15 % Produktion'}`:`<span style="color:#b0782a">gehört in einen ${DIST[k].i} ${DIST[k].n}-Bezirk (+15 %)</span>`}${B[b.type].house&&nearLoud(b)?'<br>🔊 <b style="color:#c0392b">Lärm & Dreck von nahem Industriebetrieb!</b>':''}</p>`}
   if(b.fire>0)h+=`<div class="item" style="display:block;border:2px solid #c0392b"><b>🔥 Es brennt!</b>${bar('Gelöscht',b.fx)}<small>${fireCover(b)?'🚒 Die Feuerwehr ist im Einsatz.':'🪣 Die Bewohner löschen mit Eimern – das dauert. Brennt es zu lange, verliert das Gebäude eine Stufe.'}</small></div>`;
   if(b.type==='firestation'&&!isSite(b)){const r=B.firestation.cover+2*(b.level-1),n=S.buildings.filter(o=>fireRiskOf(o)&&Math.hypot(b.x+.5-(o.x+fpW(o.type)/2),b.y+.5-(o.y+fpH(o.type)/2))<=r+.5).length;h+=`<p>🚒 Reichweite: <b>${r} Felder</b> · schützt ${n} Gebäude${wcount(b)?'':' – <b style="color:#c0392b">keine Feuerwehrleute!</b>'}</p>`}
   else if(fireRiskOf(b)&&!isSite(b))h+=`<p>🧯 Brandschutz: ${fireCover(b)?'✅ Feuerwache in Reichweite':'⚠️ keine Feuerwache in Reichweite'}</p>`;
@@ -2178,6 +2202,7 @@ function updateBanner(){
     else if(!b)t='Schon abgerissen';
     else{const rf=refund(b);ok=true;t=`🗑️ ${B[b.type].i} <b>${B[b.type].n}</b> abreißen? Zurück: ${costHtml(rf.o)}${rf.full?' <b style="color:#4f8a2b">(100 %)</b>':' (50 %)'}`}
     $('bText').innerHTML=t;$('bOk').textContent='🗑️ Entfernen';$('bOk').disabled=!ok;bn.classList.add('on');return}
+  if(distMode){$('bNo').textContent='✖';$('bText').innerHTML=`<b>🏘️ Bezirke malen:</b> ${distMode.k?DIST[distMode.k].i+' '+DIST[distMode.k].n:'🧽 Radierer'}<br>${distBanner()}`;$('bOk').textContent='✔ Fertig';$('bOk').disabled=false;bn.classList.add('on');return}
   if(gm){$('bNo').textContent='✖';
     if(gm.st==='sel'){$('bText').innerHTML=`↔️ <b>Mehrere verschieben</b> – tippe Gebäude an (${gm.ids.length} ausgewählt)`;$('bOk').textContent='➡️ Weiter';$('bOk').disabled=!gm.ids.length}
     else{const ok=gmValid();$('bText').innerHTML=`↔️ <b>${gm.ids.length} Gebäude</b> – ${gm.x==null?'tippe auf das Ziel (obere linke Ecke der Gruppe)':ok?'Platz ist frei':'Hier passt die Gruppe nicht hin'}`;$('bOk').textContent='✔ Hierhin';$('bOk').disabled=!ok}
@@ -2185,10 +2210,11 @@ function updateBanner(){
   if(!placing){bn.classList.remove('on');return}
   if(placing.ser){const d=B[placing.type],n=placing.ser.length;$('bNo').textContent='✖';$('bText').innerHTML=`🔁 <b>Serienbau: ${d.i} ${d.n}</b> – ${n?`${n} markiert · ${costHtml(serCost(n))}`:'tippe beliebig viele Plätze an (nochmal tippen = entfernen)'}`;$('bOk').textContent=`✔ Alle bauen${n?' ('+n+')':''}`;$('bOk').disabled=!n;bn.classList.add('on');return}
   $('bOk').textContent=placing.move?'✔ Hierhin':'✔ Bauen';
-  const d=B[placing.type];let t=`${placing.move?'↔️ ':''}${placing.q&&buildQ.length>1?`<b>(${placing.qi}/${placing.qn})</b> `:placing.q?`<b>(${placing.qi}/${placing.qn})</b> `:''}${d.i} <b>${d.n}</b> – `,ok=false;
+  const d=B[placing.type],dk=distOf(placing.type);let t=`${placing.move?'↔️ ':''}${placing.q&&buildQ.length>1?`<b>(${placing.qi}/${placing.qn})</b> `:placing.q?`<b>(${placing.qi}/${placing.qn})</b> `:''}${d.i} <b>${d.n}</b> – `,ok=false;
   if(placing.x==null)t+=placing.move?'tippe auf das neue Feld':'tippe auf ein freies Feld';
   else if(!validPlace(placing.x,placing.y)){const z=zoneOf(placing.x,placing.y);t+=!S.zones[z]?'Zone noch gesperrt':buildingAt(placing.x,placing.y)?'Feld ist belegt':'Hier kann nicht gebaut werden'}
   else{ok=true;if(d.near!=null){const e=effAt(placing.type,placing.x,placing.y);t+=`Effizienz <b style="color:${e===0?'#c0392b':e<.6?'#c27c0e':'#4f8a2b'}">${Math.round(e*100)} %</b>`;if(e===0){t+=` (kein ${NEAR_N[d.near]} in Reichweite)`;ok=false}}else t+='Feld frei'}
+  if(ok&&dk&&S.dist){const inn=distAt(placing.x,placing.y)===dk;t+=inn?` · ✅ ${DIST[dk].i} Bezirk +15 %`:` · <small>passt in ${DIST[dk].i} ${DIST[dk].n}</small>`}
   $('bText').innerHTML=t;$('bOk').disabled=!ok;bn.classList.add('on');
 }
 function modal(h){$('mbox').innerHTML=h;$('modal').classList.add('on')}
@@ -2199,12 +2225,13 @@ function act(a,p){
     case 'nav':gm=null;placing=null;demoMode=false;demoTarget=null;roadMode=null;updateBanner();sel=null;if(sheetKind===p)closeSheet();else openSheet(p);break;
     case 'close':closeSheet();sel=null;break;
     case 'place':{roadMode=null;demoMode=false;const d=B[p];if(p==='bank'&&S.buildings.some(b=>b.type==='bank')){toast('Es gibt nur eine Bank – baue sie lieber aus');return}if(!canPay(d.cost)){toast('Nicht genug Ressourcen');return}placing={type:p,x:null,y:null,ser:serialMode&&p!=='bank'?[]:null};closeSheet();sel=null;updateBanner();break}
-    case 'cancel':buildQ=[];gm=null;placing=null;demoMode=false;demoTarget=null;roadMode=null;updateBanner();break;
+    case 'cancel':if(distMode)save();distMode=null;buildQ=[];gm=null;placing=null;demoMode=false;demoTarget=null;roadMode=null;updateBanner();break;
     case 'roadmode':placing=null;demoMode=false;roadMode={s:null};closeSheet();sel=null;updateBanner();break;
     case 'clear':{if(demoConfirm!=='node'){demoConfirm='node';renderSheet();return}const i=sheetArg.x+sheetArg.y*W;doClear(i);demoConfirm=null;sel=null;closeSheet();break}
     case 'demomode':placing=null;roadMode=null;demoMode=true;demoTarget=null;closeSheet();sel=null;updateBanner();break;
     case 'move':{roadMode=null;demoMode=false;const b=byId(+p);if(!b)return;placing={type:b.type,x:null,y:null,move:b.id};closeSheet();sel=null;updateBanner();break}
     case 'build':{
+      if(distMode){distMode=null;S.showDist=true;updateBanner();save();toast('🏘️ Bezirke gespeichert');break}
       if(gm){if(gm.st==='sel'){if(gm.ids.length){gm.st='place';gm.x=null}updateBanner();break}if(!gmValid())return;for(const {b,nx,ny} of gmLayout()){dirtyAround(b.x,b.y);b.x=nx;b.y=ny;dirtyAround(b.x,b.y)}toast(`↔️ ${gm.ids.length} Gebäude verschoben`);gm=null;updateBanner();save();break}
       if(demoMode){const d_=demoTarget;if(d_){if(d_.k==='b'){const b=byId(d_.id);if(b)doDemolish(b)}else if(d_.k==='road')removeRoad(d_.i);else doClear(d_.i)}demoTarget=null;updateBanner();break}
       if(placing&&placing.ser){const d=B[placing.type],sp=placing.ser.slice();let n=0;
@@ -2290,6 +2317,10 @@ function act(a,p){
     case 'rtog':{const rt=S.routes[+p];if(rt){rt.on=!rt.on;renderSheet();save()}break}
     case 'rn':{const [i,dn]=p.split(':');const rt=S.routes[+i];if(rt){rt.n=Math.max(10,Math.min(routeCap(),Math.min(rt.n,routeCap())+ +dn));renderSheet();save()}break}
     case 'rquiet':S.routeQuiet=!S.routeQuiet;renderSheet();break;
+    case 'dist':distMode={k:1,br:3};placing=null;gm=null;roadMode=null;demoMode=false;closeSheet();sel=null;updateBanner();break;
+    case 'dpick':if(distMode){distMode.k=+p;updateBanner()}break;
+    case 'dbrush':if(distMode){distMode.br=distMode.br===3?1:3;updateBanner()}break;
+    case 'dshow':S.showDist=!S.showDist;renderSheet();break;
     case 'sertog':serialMode=!serialMode;if(serialMode&&multiSel){multiSel=false;buildQ=[]}renderSheet();break;
     case 'msel':multiSel=!multiSel;if(multiSel)serialMode=false;if(!multiSel)buildQ=[];renderSheet();break;
     case 'qadd':{buildQ.push(p);renderSheet();break}
