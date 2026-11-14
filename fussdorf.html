@@ -1771,13 +1771,16 @@ function render(dt){
 }
 
 // ======================= EINGABE =======================
-const ptrs=new Map();let buildQ=[],multiSel=false,serialMode=false,distMode=null,gm=null,GM_IGN=null,tapStart=null,pinch=null,sel=null,placing=null,demoMode=false,demoTarget=null,roadMode=null,pathGen=0;
+const ptrs=new Map();let LP_T=null,buildQ=[],multiSel=false,serialMode=false,distMode=null,gm=null,GM_IGN=null,tapStart=null,pinch=null,sel=null,placing=null,demoMode=false,demoTarget=null,roadMode=null,pathGen=0;
 function clampCam(){const vw=innerWidth/cam.z,vh=innerHeight/cam.z;cam.x=Math.max(-vw/2,Math.min(W*T-vw/2,cam.x));cam.y=Math.max(-vh/2,Math.min(H*T-vh/2,cam.y))}
 function pinchStart(){const p=[...ptrs.values()];const d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y)||1,mx=(p[0].x+p[1].x)/2,my=(p[0].y+p[1].y)/2;pinch={d0:d,z0:cam.z,wx:cam.x+mx/cam.z,wy:cam.y+my/cam.z}}
 cv.addEventListener('pointerdown',e=>{
   try{cv.setPointerCapture(e.pointerId)}catch(_){}
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(ptrs.size===1)tapStart={x:e.clientX,y:e.clientY,moved:false};else{tapStart=null;pinchStart()}
+  if(ptrs.size===1){tapStart={x:e.clientX,y:e.clientY,moved:false};const ts=tapStart;clearTimeout(LP_T);
+    if(!placing&&!gm&&!distMode&&!roadMode&&!demoMode)LP_T=setTimeout(()=>{if(tapStart!==ts||ts.moved||ptrs.size!==1)return;const tx=Math.floor((cam.x+ts.x/cam.z)/T),ty=Math.floor((cam.y+ts.y/cam.z)/T),b=inMap(tx,ty)&&buildingAt(tx,ty);
+      if(!b)return;ts.long=true;if(B[b.type].fixed){toast('Das Lagerfeuer bleibt, wo es ist');return}try{navigator.vibrate&&navigator.vibrate(30)}catch(_){}act('move',String(b.id));toast(`↔️ ${B[b.type].i} ${B[b.type].n} verschieben – tippe auf den neuen Platz`)},550)}
+  else{tapStart=null;pinchStart()}
 });
 cv.addEventListener('pointermove',e=>{
   const p=ptrs.get(e.pointerId);if(!p)return;
@@ -1793,7 +1796,7 @@ cv.addEventListener('pointermove',e=>{
 function pEnd(e,cancel){
   if(!ptrs.has(e.pointerId))return;
   ptrs.delete(e.pointerId);
-  if(!cancel&&tapStart&&!tapStart.moved&&ptrs.size===0)onTap(e.clientX,e.clientY);
+  clearTimeout(LP_T);if(!cancel&&tapStart&&!tapStart.moved&&!tapStart.long&&ptrs.size===0)onTap(e.clientX,e.clientY);
   if(ptrs.size<2)pinch=null;
   if(ptrs.size===0)tapStart=null;
 }
@@ -1831,8 +1834,8 @@ function onTap(sx,sy){
   if(placing){placing.x=tx;placing.y=ty;updateBanner();return}
   if(roadMode){if(!roadMode.s){if(!S.zones[zoneOf(tx,ty)]){toast('Zone noch gesperrt');return}roadMode.s={x:tx,y:ty}}else{buildRoad(roadMode.s,{x:tx,y:ty});roadMode.s={x:tx,y:ty}}updateBanner();return}
   if(!demoMode&&S.trader){const c=S.buildings[0],wxp=(cam.x+sx/cam.z)/T,wyp=(cam.y+sy/cam.z)/T;if(Math.hypot(c.x+1.6-wxp,c.y+.5-wyp)<.6){sel=null;openSheet('trader');return}}
-  if(!demoMode&&S.hero){const wxp=(cam.x+sx/cam.z)/T,wyp=(cam.y+sy/cam.z)/T;if(Math.hypot(S.hero.x-wxp,S.hero.y-wyp)<.55){sel=null;openSheet('hero');return}}
-  if(!demoMode){const wxp=(cam.x+sx/cam.z)/T,wyp=(cam.y+sy/cam.z)/T;let bv=null,bd=.45;for(const v of S.vill){if(v.asleep)continue;const d=Math.hypot(v.x-wxp,v.y-wyp);if(d<bd){bd=d;bv=v}}if(bv){sel=null;openSheet('v',bv.id);return}}
+  if(!demoMode&&S.hero&&!buildingAt(tx,ty)){const wxp=(cam.x+sx/cam.z)/T,wyp=(cam.y+sy/cam.z)/T;if(Math.hypot(S.hero.x-wxp,S.hero.y-wyp)<.55){sel=null;openSheet('hero');return}}
+  if(!demoMode&&!buildingAt(tx,ty)){const wxp=(cam.x+sx/cam.z)/T,wyp=(cam.y+sy/cam.z)/T;let bv=null,bd=.45;for(const v of S.vill){if(v.asleep)continue;const d=Math.hypot(v.x-wxp,v.y-wyp);if(d<bd){bd=d;bv=v}}if(bv){sel=null;openSheet('v',bv.id);return}}
   if(demoMode){const i=tx+ty*W,b=buildingAt(tx,ty);
     if(b){if(B[b.type].fixed){toast('Das Lagerfeuer kann nicht abgerissen werden');demoTarget=null}else demoTarget={k:'b',id:b.id}}
     else if(S.road[i])demoTarget={k:'road',i};
