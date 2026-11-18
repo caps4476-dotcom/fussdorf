@@ -140,7 +140,8 @@ const B={
   market:{n:'Marktplatz',i:'🎪',roof:'#c9a46a',cost:{planks:20,stone:20,gold:30},joy:6,req:'market',desc:'Buntes Treiben: +6 Freude pro Stufe.'},
   school:{n:'Schule',i:'🏫',roof:'#b85a3a',cost:{wood:40,stone:30,planks:20,gold:40},req:'schooling',desc:'Kinder lernen hier (6 Plätze pro Stufe). Wer mind. die halbe Kindheit zur Schule geht, wird erwachsen „gebildet“: +15 % Arbeitsleistung.'},
   uni:{n:'Universität',i:'🎓',roof:'#6a3a8a',cost:{stone:80,planks:50,iron:20,gold:150},slots:2,req:'university',desc:'Gebildete studieren hier 1 Tag und werden „Gelehrte“: +30 % Leistung, im Gelehrtenhaus doppelt so viel Forschung. Gelehrte braucht man für moderne Forschung.'},
-  power:{n:'Kraftwerk',i:'⚡',roof:'#4a5a7a',cost:{stone:60,planks:40,iron:20,gold:80},slots:2,conv:{in:{wood:0.3},out:{}},req:'electricity',desc:'Verbrennt Holz zu Strom. Versorgt 8 Betriebe pro Stufe mit +25 % Produktion. Nachts leuchten Laternen an den Wegen.'},
+  power:{n:'Kraftwerk',i:'⚡',roof:'#4a5a7a',cost:{stone:60,planks:40,iron:20,gold:80},slots:2,conv:{in:{wood:0.3},out:{}},req:'electricity',desc:'Verbrennt Holz (später Kohle oder Müll) zu Strom. Liefert 20 Stromeinheiten pro Stufe ins Netz. Strom fließt über die Wege zu allen Gebäuden, die an einem verbundenen Weg liegen.'},
+  waterworks:{n:'Wasserwerk',i:'💧',roof:'#2e6a9a',cost:{stone:50,planks:30,iron:10},slots:2,near:WA,r:2,req:'water',desc:'Pumpt Wasser aus See oder Fluss (Wasser im Radius 2) und liefert 25 Wassereinheiten pro Stufe ins Netz. Wasser fließt über die Wege zu Häusern und Betrieben.'},
   garage:{n:'Fuhrhof',i:'🛻',roof:'#5a6a4a',cost:{planks:50,iron:30,tools:10,gold:150},slots:2,conv:{in:{tools:0.005},out:{}},req:'vehicles',desc:'Karren und Fuhrwerke: Alle Bewohner laufen 40 % schneller und tragen beim Sammeln 2 mehr. Verbraucht etwas Werkzeug.'},
   bank:{n:'Bank',i:'🏦',roof:'#6a7a8a',cost:{stone:40,planks:30,gold:50},req:'banking',desc:'Sparkonto, Festgeld und Kredite. Jede Stufe erhöht die maximale Anlagesumme.'},
   stall:{n:'Händlerstand',i:'🏪',roof:'#d08a3a',cost:{wood:20,stone:10},desc:'Hier verkaufst du Waren für Gold und kaufst ein. Jede Stufe: +8 % bessere Preise. Lockt den fahrenden Händler an.'},
@@ -204,6 +205,7 @@ Object.assign(R,{
   robotics:{n:'Robotik',i:'🤖',ep:3,cost:{research:800,gold:1000,tools:50},need:['industry'],desc:'Schaltet die Roboterfabrik frei.'},
   vfarming:{n:'Vertical Farming',i:'🥬',ep:3,cost:{research:500,gold:600},need:['agri2'],desc:'Schaltet die Vertikalfarm frei.'},
   firefighting:{n:'Brandschutz',i:'🚒',cost:{research:40,gold:20},desc:'Schaltet die Feuerwache frei.'},
+  water:{n:'Wasserversorgung',i:'💧',cost:{research:60,gold:40},desc:'Schaltet das Wasserwerk frei.'},
   herbs:{n:'Kräuterkunde',i:'🌿',cost:{research:30,gold:10},desc:'Schaltet die Kräuterhütte frei.'},
   medicine:{n:'Medizin',i:'💊',cost:{research:160,gold:150},need:['schooling','herbs'],desc:'Schaltet das Krankenhaus frei.'},
   hunting:{n:'Jagd',i:'🏹',cost:{research:25,gold:10},desc:'Schaltet die Jägerhütte frei.'},
@@ -380,7 +382,7 @@ function happy(){
   const home=(hs.length?Math.min(1,.3+.175*hs.reduce((a,b)=>a+b.level,0)/hs.length):.3)*Math.min(1,popCap()/Math.max(1,adults()));
   const J=joyCalc();
   const joy=Math.min(1,J.base*(S.hero&&S.hero.c==='lyonessa'?1.5:1)+(seasonIdx()===3?.03:0)+(adults()>=6?.05*(S.sec==null?1:S.sec):0)+(festOn()?.4:0)+(fairOn()?.3:0));
-  return {food,home,joy,total:Math.max(0,Math.min(1,.4*food+.3*home+.3*joy-taxPen()-.25*dirtLvl()+(S.res.meat>1?.06:0)-.4*sickN()/Math.max(1,adults())+.08*distStats().home-.12*distStats().loud))};
+  return {food,home,joy,total:Math.max(0,Math.min(1,.4*food+.3*home+.3*joy-taxPen()-.25*dirtLvl()+(S.res.meat>1?.06:0)-.4*sickN()/Math.max(1,adults())+.08*distStats().home-.12*distStats().loud-.2*netShare().up-.1*netShare().uw))};
 }
 const needXP=L=>Math.round(30*Math.pow(L,1.5));
 function lvInfo(){let L=1,x=S.xp;while(x>=needXP(L)){x-=needXP(L);L++}return{L,x,n:needXP(L)}}
@@ -528,6 +530,50 @@ function drawDist(){if(!S.dist)return;const strong=!!distMode;if(!strong&&!S.sho
     ctx.globalAlpha=strong?.9:.5;ctx.strokeStyle=DIST[k].c;ctx.lineWidth=1.5/cam.z;ctx.beginPath();if(distAt(x,y-1)!==k){ctx.moveTo(x*T,y*T);ctx.lineTo(x*T+T,y*T)}if(distAt(x,y+1)!==k){ctx.moveTo(x*T,y*T+T);ctx.lineTo(x*T+T,y*T+T)}if(distAt(x-1,y)!==k){ctx.moveTo(x*T,y*T);ctx.lineTo(x*T,y*T+T)}if(distAt(x+1,y)!==k){ctx.moveTo(x*T+T,y*T);ctx.lineTo(x*T+T,y*T+T)}ctx.stroke()}
   ctx.globalAlpha=1}
 
+// ======================= VERSORGUNGSNETZ =======================
+const PW_NEED=['sawmill','mill','bakery','smelter','toolsmith','butcher','factory','coalmine','mine','diamondmine','school','uni','scholar','hospital','cinema','supermarket','market','tavern','stall','bank','tradepost','firestation','dump','robots','vfarm','jeweler','herbs','garage','station'];
+const PW_HARD=['factory','cinema','supermarket','robots','vfarm'];
+const WA_NEED=['hospital','firestation','bakery','butcher','tavern','vfarm','factory','supermarket'];
+const netOn=()=>!!S.tech.electricity;
+const isHouse=b=>!!B[b.type].house&&b.type!=='camp';
+const needP=b=>!isSite(b)&&(isHouse(b)||PW_NEED.includes(b.type));
+const needW=b=>!isSite(b)&&(isHouse(b)||WA_NEED.includes(b.type));
+const demOf=b=>b.type==='apartment'?3*b.level:isHouse(b)?1:(fpW(b.type)*fpH(b.type)>1?2:1);
+let NET=null,NET_T=-1e9;
+function netGrace(){return S.netGrace&&S.netGrace>S.gt?Math.max(0,(S.netGrace-S.gt)/600):0}
+function netAround(b,f){const w=fpW(b.type),h=fpH(b.type);for(let y=b.y-1;y<=b.y+h;y++)for(let x=b.x-1;x<=b.x+w;x++){const ins=x>=b.x&&x<b.x+w&&y>=b.y&&y<b.y+h,cor=(x<b.x||x>=b.x+w)&&(y<b.y||y>=b.y+h);if(ins||cor||!inMap(x,y))continue;f(x,y)}}
+function netCalc(force){
+  if(!netOn()){NET=null;return null}
+  if(!force&&NET&&performance.now()-NET_T<1500)return NET;NET_T=performance.now();
+  const N=W*H,comp=new Int32Array(N).fill(-1);let nc=0;
+  for(let i=0;i<N;i++){if(!S.road[i]||comp[i]>=0)continue;const st=[i];comp[i]=nc;while(st.length){const j=st.pop(),x=j%W,y=(j/W)|0;for(const [a,c] of [[1,0],[-1,0],[0,1],[0,-1]]){const xx=x+a,yy=y+c;if(!inMap(xx,yy))continue;const k=xx+yy*W;if(S.road[k]&&comp[k]<0){comp[k]=nc;st.push(k)}}}nc++}
+  const par=Array.from({length:nc},(_,i)=>i),fd=a=>{while(par[a]!==a)a=par[a]=par[par[a]];return a},un=(a,b)=>{a=fd(a);b=fd(b);if(a!==b)par[a]=b};
+  const compsOf=b=>{const cs=new Set();netAround(b,(x,y)=>{const c=comp[x+y*W];if(c>=0)cs.add(c)});return [...cs]};
+  const cnt=workerCounts(),P=new Array(nc).fill(0),Wt=new Array(nc).fill(0),src=[];
+  for(const b of S.buildings){if(isSite(b))continue;let ps=0,ws=0;
+    if(b.type==='power'){const w=cnt[b.id]||0,fuel=S.res.wood>1||(S.tech.incinerate&&S.res.trash>1)||(S.tech.steam&&S.res.coal>1);if(w&&fuel)ps=20*b.level*Math.min(1,w/slots(b))*(S.tech.steam&&S.res.coal>1?1.5:1)}
+    else if(b.type==='solar')ps=15*b.level*[.9,1.2,.8,.4][seasonIdx()];
+    else if(b.type==='waterworks'){const w=cnt[b.id]||0;if(w&&eff(b)>0)ws=25*b.level*Math.min(1,w/slots(b))}
+    if(ps||ws||b.type==='power'||b.type==='solar'||b.type==='waterworks'){const cs=compsOf(b);for(let i=1;i<cs.length;i++)un(cs[0],cs[i]);src.push({b,cs,ps,ws})}}
+  for(const q of src)if(q.cs.length){const r=fd(q.cs[0]);P[r]+=q.ps;Wt[r]+=q.ws}
+  const pOK=new Set(),wOK=new Set();let pS=P.reduce((a,b)=>a+b,0),wS=Wt.reduce((a,b)=>a+b,0),pD=0,wD=0,pC=0,wC=0;const P2=P.slice(),W2=Wt.slice();
+  const cons=S.buildings.filter(b=>needP(b)||needW(b)).sort((a,b)=>a.id-b.id);
+  for(const b of cons){const cs=[...new Set(compsOf(b).map(fd))],dm=demOf(b);
+    if(needP(b)){pD+=dm;const c=cs.find(c=>P2[c]>=dm);if(cs.some(c=>P[c]>0))pC+=dm;if(c!=null){P2[c]-=dm;pOK.add(b.id)}}
+    if(needW(b)){wD+=dm;const c=cs.find(c=>W2[c]>=dm);if(cs.some(c=>Wt[c]>0))wC+=dm;if(c!=null){W2[c]-=dm;wOK.add(b.id)}}}
+  const live=new Set();for(let i=0;i<N;i++)if(comp[i]>=0&&(P[fd(comp[i])]>0||Wt[fd(comp[i])]>0))live.add(i);
+  NET={pOK,wOK,pS,wS,pD,wD,pC,wC,comp,fd,P,Wt,live};return NET}
+function powered(b){if(!netOn()||!needP(b))return true;const n=netCalc();return n.pOK.has(b.id)}
+function watered(b){if(!netOn()||!needW(b))return true;const n=netCalc();return n.wOK.has(b.id)}
+function netShare(){if(!netOn())return {up:0,uw:0};const n=netCalc(),hs=S.buildings.filter(b=>isHouse(b)&&!isSite(b));if(!hs.length)return {up:0,uw:0};const g=1-netGrace();return {up:g*hs.filter(b=>!n.pOK.has(b.id)).length/hs.length,uw:g*hs.filter(b=>!n.wOK.has(b.id)).length/hs.length}}
+function drawNet(){if(!netOn())return;const n=netCalc(),show=S.netView||placing&&['power','waterworks','solar'].includes(placing.type);
+  if(show){ctx.lineWidth=1.2/cam.z;for(const i of n.live){const x=i%W,y=(i/W)|0,c=n.fd(n.comp[i]);ctx.strokeStyle=n.P[c]>0?'rgba(255,210,60,.9)':'rgba(0,0,0,0)';ctx.beginPath();ctx.moveTo(x*T+3,y*T+3);ctx.lineTo(x*T+T-3,y*T+3);ctx.stroke();ctx.strokeStyle=n.Wt[c]>0?'rgba(70,160,255,.9)':'rgba(0,0,0,0)';ctx.beginPath();ctx.moveTo(x*T+3,y*T+T-3);ctx.lineTo(x*T+T-3,y*T+T-3);ctx.stroke()}}
+  const g=netGrace()>0;ctx.textAlign='center';ctx.textBaseline='middle';
+  for(const b of S.buildings){if(isSite(b))continue;const np=needP(b)&&!n.pOK.has(b.id),nw=needW(b)&&!n.wOK.has(b.id);if(!show&&!np&&!nw)continue;if(!needP(b)&&!needW(b))continue;
+    const x=(b.x+fpW(b.type))*T-7,y=b.y*T+fpH(b.type)*T-7;let k=0;
+    const badge=(ic,ok)=>{const bx=x-k*12;ctx.fillStyle=ok?'rgba(255,255,255,.9)':g?'rgba(255,200,80,.95)':'rgba(220,50,40,.95)';ctx.beginPath();ctx.arc(bx,y,5.5,0,7);ctx.fill();ctx.font='7px sans-serif';ctx.fillStyle='#000';ctx.fillText(ok?ic:ic,bx,y+.5);if(!ok){ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(bx-4,y+4);ctx.lineTo(bx+4,y-4);ctx.stroke()}k++};
+    if(needP(b)&&(show||np))badge('⚡',!np);if(needW(b)&&(show||nw))badge('💧',!nw)}}
+
 // ======================= FEUER =======================
 const FIRE_RISK={bakery:3,toolsmith:3,smelter:3,sawmill:2,tavern:2,power:2.5,factory:3,coalmine:2,woodcutter:1.5,house:1,storage:1.2,storage2:1.2,storage3:1,farm:1.2,mill:1.5,cinema:1.5,butcher:1.5,hunter:1.2};
 const FIRE_DMG=90;
@@ -538,7 +584,7 @@ function fireTick(dt,live){
   if(live&&S.vill.length>=20){const sf=[1,1.3,1,1.5][seasonIdx()];for(const b of S.buildings){if(b.fire||isSite(b))continue;const r=fireRiskOf(b);if(r&&Math.random()<.000012*r*sf*dt){b.fire=.01;b.fx=0;toast(`🔥 Feuer! ${B[b.type].i} ${B[b.type].n} brennt${fireCover(b)?' – die Feuerwehr rückt aus! 🚒':' – die Bewohner löschen mit Eimern. Eine 🚒 Feuerwache wäre schneller!'}`);S.fires=(S.fires||0)+1}}}
   for(const b of burning){
     b.fire+=dt;const st=fireCover(b),wells=S.buildings.filter(w=>(w.type==='fountain'||w.type==='well')&&!isSite(w)&&Math.hypot(w.x-b.x,w.y-b.y)<5).length;
-    let rate=.007+.006*Math.min(3,wells);if(st)rate+=.035*wcount(st)*(1+.3*(st.level-1));
+    let rate=.007+.006*Math.min(3,wells);if(st)rate+=.035*wcount(st)*(1+.3*(st.level-1))*(watered(st)?1:.4);
     if(b.ft==null)b.ft=st?st.id:null;
     b.fx+=rate*dt;
     if(b.fx>=1){b.fire=0;b.fx=0;b.ft=null;if(live)toast(`🧯 ${B[b.type].i} ${B[b.type].n} ist gelöscht!${st?' Gut gemacht, Feuerwehr! 🚒':''}`);continue}
@@ -592,6 +638,7 @@ function sheetEpoch(){
 function epochUp(){const c=epochCheck();if(!c||!c.ok)return;pay(c.e.req.res);S.epoch=EP()+1;drawAllTerrain();gainXP(300);closeSheet();
   modal(`<h3>${c.e.i} ${c.e.n}</h3><p class="desc" style="font-size:15px;line-height:1.45">${c.e.story}</p><p><b>Neu:</b> +10 % Produktion, neue Gebäude und Forschungen, neues Aussehen.</p><button class="big" data-act="mclose">Auf in die neue Zeit!</button>`);
   startFireworks(true,`${c.e.i} Willkommen in der ${c.e.n}! ${c.e.i}`);save()}
+function netTick(live){if(netOn()&&S.netGrace==null){S.netGrace=S.gt+600;if(live)modal(`<h3>⚡💧 Versorgungsnetz</h3><p class="desc" style="font-size:15px">Ab jetzt brauchen Häuser, Werkstätten und Geschäfte <b>Strom</b> und <b>Wasser</b>. Beides fließt über die <b>Wege</b>: Ein Gebäude ist versorgt, wenn es an einem Weg liegt, der mit einem Kraftwerk bzw. Wasserwerk verbunden ist.</p><p class="desc">Du hast <b>10 Minuten Übergangszeit</b>, um dein Netz aufzubauen. Mit <b>⚡💧 Netz</b> im Bau-Menü siehst du, was versorgt ist. Rote Symbole zeigen Gebäude ohne Versorgung.</p><button class="big" data-act="mclose">Verstanden</button>`)}}
 function epochTick(dt){let r=0,ir=0;for(const b of S.buildings)if(b.type==='robots'&&!isSite(b)&&wcount(b)){r+=.08*b.level;ir+=.02*b.level}
   if(r&&S.res.iron>ir*dt){S.res.iron-=ir*dt;ROBO=Math.min(.4,r)}else ROBO=0}
 
@@ -720,7 +767,7 @@ function drawFair(){
 // ======================= GESUNDHEIT =======================
 const SICK_T=300;
 const sickN=()=>S.vill.reduce((n,v)=>n+(v.sick>0?1:0),0);
-function sickRisk(){const hs=S.buildings.filter(b=>b.type==='house'),ice=hs.length?hs.filter(b=>biomeAt(b.x,b.y)==='eis').length/hs.length:0;return .00006*(1+1.5*ice+3*dirtLvl()+(S.res.food<=.001?3:0)+(seasonIdx()===3?1.2:0))*(S.res.meat>1?.85:1)}
+function sickRisk(){const hs=S.buildings.filter(b=>b.type==='house'),ice=hs.length?hs.filter(b=>biomeAt(b.x,b.y)==='eis').length/hs.length:0;return .00006*(1+1.5*ice+2*netShare().uw+3*dirtLvl()+(S.res.food<=.001?3:0)+(seasonIdx()===3?1.2:0))*(S.res.meat>1?.85:1)}
 function hospBeds(b){const w=wcount(b);return w?Math.round(4*b.level*Math.min(1,w/2)):0}
 function healthTick(dt,live){
   const hos=S.buildings.filter(b=>b.type==='hospital'&&!isSite(b));
@@ -791,7 +838,8 @@ function multParts(b,r){const P=[],add=(i,n,f)=>{if(Math.abs(f-1)>.001)P.push([i
   add('🏗️','Ausbaustufe '+b.level,1+.5*(b.level-1));
   let t=1;if(T_.tools1&&(r==='wood'||r==='stone'))t*=1.2;if(T_.tools2)t*=1.3;if(T_.tools3)t*=1.25;if(T_.diamondtools)t*=1.2;if(T_.gemcraft2){if(r==='diamond')t*=1.5;if(r==='stone'||r==='ore')t*=1.15}if(T_.agri2&&(r==='food'||r==='grain'))t*=1.25;if(T_.mining2&&(r==='stone'||r==='ore'))t*=1.25;add('🔬','Forschung & Werkzeuge',t);
   if(hasRoad(b))add('🛤️','Straßenanschluss',1.1);
-  if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))add('⚡','Strom',1+.25*PWR);
+  if(!netOn()){if(PWR&&B[b.type].slots&&!['power','uni','garage'].includes(b.type))add('⚡','Strom',1+.25*PWR)}else if(needP(b)){if(powered(b))add('⚡','Strom',1.25);else{const gr=netGrace(),lo=PW_HARD.includes(b.type)?0:.3;add('⚡','Kein Strom!',lo+(1-lo)*gr)}}
+  if(netOn()&&needW(b)&&!isHouse(b)&&!watered(b))add('💧','Kein Wasser',.7+.3*netGrace());
   add('🤖','Roboter',1+ROBO);add('🕰️','Epoche',1+.1*(S.epoch||0));
   if(inDist(b))add('🏘️','Passender Bezirk',1.15);add('🗺️','Landschaft',bioMult(b));
   let h=1;if(S.story&&S.story.bless)h*=1.15;if(hc==='thordis'&&r==='wood')h*=1.1;if(hc==='elmiran'&&r==='food')h*=1.15;if(hc==='zara'&&r==='research')h*=1.25;if(hc==='serafina'&&(r==='iron'||r==='planks'||b.type==='smelter'||b.type==='sawmill'))h*=1.15;add('🦸','Held & Segen',h);
@@ -866,6 +914,7 @@ function tick(dt,live){
   fairTick(dt,live);
   routeTick(dt,live);
   epochTick(dt);
+  netTick(live);
   fireTick(dt,live);
   if(live)advisorTick(dt);
   moodTick(dt,live);
@@ -1722,6 +1771,7 @@ function render(dt){
   drawFair();
   drawCaravans();
   for(const b of S.buildings)if(vis(b.x,b.y)||(B[b.type].fw&&vis(b.x+fpW(b.type)-1,b.y+fpH(b.type)-1))){if(placing&&placing.move===b.id)ctx.globalAlpha=.35;drawBuilding(b,cnt);if(b.type==='house'&&DLV>.12&&!isSite(b))drawBags(b);ctx.globalAlpha=1;if(demoMode&&demoTarget&&demoTarget.k==='b'&&demoTarget.id===b.id){ctx.fillStyle='rgba(255,60,40,.45)';ctx.fillRect(b.x*T,b.y*T,T*fpW(b.type),T*fpH(b.type));ctx.font=`${T*.5}px sans-serif`;ctx.fillText('❌',(b.x+fpW(b.type)/2)*T,(b.y+fpH(b.type)/2)*T)}}
+  drawNet();
   drawFires();
   drawGroup();
   const vs=S.vill.filter(v=>vis(v.x,v.y)).sort((a,b)=>a.y-b.y);
@@ -1888,7 +1938,7 @@ function renderSheet(){
 }
 function sheetBuild(){
   let h='<h3>🔨 Bauen</h3><div class="row" style="margin-bottom:8px"><button class="danger" data-act="roadmode" style="margin:0">🛣️ Wege bauen</button><button class="danger" data-act="demomode" style="margin:0">🗑️ Abriss-Modus</button></div><p class="desc" style="margin-bottom:8px">Wege: 1 🪨 pro Feld. Bewohner laufen darauf fast doppelt so schnell, Gebäude mit Weganschluss arbeiten +10 %. Der Abriss-Modus entfernt auch Wege, Bäume und Felsen.</p>';
-  h+=`<div class="row" style="margin-bottom:8px"><button class="sm" style="margin:0;${multiSel?'background:#4f8a2b':'background:#8a7a6a'}" data-act="msel">${multiSel?'☑️ Mehrfachauswahl AN':'☐ Mehrfachauswahl'}</button><button class="sm" style="margin:0" data-act="gmove">↔️ Mehrere verschieben</button></div><div class="row" style="margin:-2px 0 8px"><button class="sm" style="margin:0;background:#3a6a8a" data-act="dist">🏘️ Bezirke malen</button><button class="sm" style="margin:0;background:#8a7a6a" data-act="dshow">${S.showDist?'👁️ Bezirke ausblenden':'👁️ Bezirke anzeigen'}</button></div><div class="row" style="margin:-2px 0 8px"><button class="sm" style="margin:0;${serialMode?'background:#4f8a2b':'background:#8a7a6a'}" data-act="sertog">${serialMode?'🔁 Serienbau AN – Gebäude antippen, dann beliebig viele Plätze markieren':'🔁 Serienbau: ein Gebäude mehrfach bauen'}</button></div>`;
+  h+=`<div class="row" style="margin-bottom:8px"><button class="sm" style="margin:0;${multiSel?'background:#4f8a2b':'background:#8a7a6a'}" data-act="msel">${multiSel?'☑️ Mehrfachauswahl AN':'☐ Mehrfachauswahl'}</button><button class="sm" style="margin:0" data-act="gmove">↔️ Mehrere verschieben</button></div><div class="row" style="margin:-2px 0 8px"><button class="sm" style="margin:0;background:#3a6a8a" data-act="dist">🏘️ Bezirke malen</button>${netOn()?`<button class="sm" style="margin:0;background:${S.netView?'#d4a017':'#8a7a6a'}" data-act="netv">⚡💧 Netz</button>`:''}<button class="sm" style="margin:0;background:#8a7a6a" data-act="dshow">${S.showDist?'👁️ Bezirke ausblenden':'👁️ Bezirke anzeigen'}</button></div><div class="row" style="margin:-2px 0 8px"><button class="sm" style="margin:0;${serialMode?'background:#4f8a2b':'background:#8a7a6a'}" data-act="sertog">${serialMode?'🔁 Serienbau AN – Gebäude antippen, dann beliebig viele Plätze markieren':'🔁 Serienbau: ein Gebäude mehrfach bauen'}</button></div>`;
   if(multiSel){const cnt={};for(const t of buildQ)cnt[t]=(cnt[t]||0)+1;const qc=qCost(),ok=canPay(qc);
     h+=`<div class="item" style="display:block;border:2px solid #4f8a2b;padding:8px 10px"><b>🧺 Auswahl: ${buildQ.length} Gebäude</b>${buildQ.length?`<small>${Object.keys(cnt).map(t=>`${B[t].i} ${B[t].n} ×${cnt[t]}`).join(' · ')}</small><div class="cost">Gesamt: ${costHtml(qc)}${ok?'':' <b style="color:#c0392b">– reicht nicht für alle</b>'}</div><div class="row" style="gap:5px;margin-top:6px"><button class="sm" data-act="qstart">▶️ Nacheinander platzieren</button><button class="sm" style="background:#8a7a6a" data-act="qclr">Leeren</button></div>`:'<small>Tippe unten Gebäude an – auch mehrmals dasselbe. Danach platzierst du sie nacheinander auf der Karte.</small>'}</div>`}
   for(const k in B){const d=B[k];if(d.fixed)continue;const lk=d.req&&!S.tech[d.req],qn=buildQ.filter(t=>t===k).length;
@@ -1951,6 +2001,7 @@ function sheetVillage(){
    if(gen>0)h+=row('🗑️','Müllabfuhr',col/gen,`${f1(col*60)} / ${f1(gen*60)} pro Min.`);
    {const rb=S.buildings.filter(b=>!isSite(b)&&fireRiskOf(b)),cv=rb.filter(b=>fireCover(b)).length;if(rb.length)h+=row('🚒','Brandschutz',cv/rb.length,`${cv} / ${rb.length} Gebäude geschützt`)}
    {const prod=S.buildings.filter(b=>!isSite(b)&&distOf(b.type)),inn=prod.filter(inDist).length,ds=distStats();if(prod.length)h+=row('🏘️','Im passenden Bezirk',inn/prod.length,`${inn} / ${prod.length} Gebäude`);if(ds.hs)h+=row('🔇','Ruhige Wohnlage',1-ds.loud,`${Math.round((1-ds.loud)*100)} % der Häuser`)}
+   if(netOn()){const n=netCalc(),pc_=S.buildings.filter(needP),wc_=S.buildings.filter(needW);h+=row('⚡','Strom',pc_.length?n.pOK.size/pc_.length:1,`${n.pOK.size}/${pc_.length} Gebäude · ${Math.round(n.pS)}/${n.pD} Einh.`);h+=row('💧','Wasser',wc_.length?n.wOK.size/wc_.length:1,`${n.wOK.size}/${wc_.length} Gebäude · ${Math.round(n.wS)}/${n.wD} Einh.`)}
    h+=row('👷','Arbeitsplätze',slotsT/ad,`${slotsT} Plätze / ${ad} Erw.`);
    h+=`</div>`}
   if(vt==='ov')h+=`<div class="item" data-act="nav:epoch" style="display:block;padding:7px 10px"><b>🕰️ Epoche: ${EPOCHS[EP()].i} ${EPOCHS[EP()].n}</b>${epochCheck()?`<small>Nächste: ${EPOCHS[EP()+1].i} ${EPOCHS[EP()+1].n}${epochCheck().ok?' – <b style="color:#4f8a2b">bereit!</b>':''} · antippen für Details</small>`:''}</div>`;
@@ -2066,7 +2117,10 @@ function advice(){
   if(!S.rs){const can=Object.keys(R).filter(k=>!S.tech[k]&&gateOk(k)&&!(R[k].need||[]).some(n=>!S.tech[n])&&canPay(R[k].cost)&&(!R[k].edu||eduCount()>=R[k].edu));if(can.length)add(0,'🔬','Keine Forschung aktiv',`Du kannst gerade ${can.length} Forschung${can.length>1?'en':''} starten, z. B. ${R[can[0]].i} ${R[can[0]].n}.`,'nav:research','🔬 Forschung','res')}
   // Wild, Strom, Ruhe
   if(bl('hunter').length&&wildF()<.3)add(1,'🦌','Das Wild wird knapp','Deine Jäger jagen zu viel. Nimm Jäger heraus, damit sich der Bestand erholt.','ob:'+bl('hunter')[0].id,'🏹 Zur Jägerhütte','wild');
-  if(bl('power').length&&PWR_D>PWR_S)add(0,'⚡','Zu wenig Strom',`Strom für ${Math.round(PWR_S)} von ${PWR_D} Betrieben. Baue das Kraftwerk aus${S.res.wood<5&&!(S.tech.incinerate&&S.res.trash>1)?' – und es fehlt Brennstoff (Holz)!':''}.`,'ob:'+bl('power')[0].id,'⚡ Zum Kraftwerk','power');
+  if(netOn()){const n=netCalc(),up=S.buildings.filter(b=>needP(b)&&!n.pOK.has(b.id)),uw=S.buildings.filter(b=>needW(b)&&!n.wOK.has(b.id)),gr=netGrace()>0;
+    if(up.length){const why=n.pS<n.pD?`Das Netz liefert nur ${Math.round(n.pS)} von ${n.pD} benötigten Einheiten – baue Kraftwerke aus oder neue.`:'Diese Gebäude liegen an keinem Weg, der mit einem Kraftwerk verbunden ist – verbinde sie mit Wegen.';add(gr?1:2,'⚡',`${up.length} Gebäude ohne Strom${gr?' (Übergangszeit)':''}`,`${why} Ohne Strom arbeiten Betriebe kaum, moderne Gebäude gar nicht, und Bewohner sind unzufrieden.`,'ob:'+up[0].id,'⚡ Hinschauen','nopow')}
+    if(uw.length){const why=!S.tech.water?'Erforsche 💧 Wasserversorgung und baue ein Wasserwerk am See.':!bl('waterworks').length?'Baue ein 💧 Wasserwerk am Wasser.':n.wS<n.wD?`Das Netz liefert nur ${Math.round(n.wS)} von ${n.wD} Einheiten – baue Wasserwerke aus.`:'Verbinde die Gebäude über Wege mit dem Wasserwerk.';add(gr?1:2,'💧',`${uw.length} Gebäude ohne Wasser${gr?' (Übergangszeit)':''}`,why+' Ohne Wasser werden Bewohner öfter krank.',!S.tech.water?'nav:research':'ob:'+uw[0].id,!S.tech.water?'🔬 Forschung':'💧 Hinschauen','nowat')}}
+  if(!netOn()&&bl('power').length&&PWR_D>PWR_S)add(0,'⚡','Zu wenig Strom',`Strom für ${Math.round(PWR_S)} von ${PWR_D} Betrieben. Baue das Kraftwerk aus${S.res.wood<5&&!(S.tech.incinerate&&S.res.trash>1)?' – und es fehlt Brennstoff (Holz)!':''}.`,'ob:'+bl('power')[0].id,'⚡ Zum Kraftwerk','power');
   return A.sort((a,b)=>b.lv-a.lv);
 }
 const LVC=['#4f8a2b','#c9a227','#d07a1a','#c0392b'],LVN=['Tipp','Hinweis','Wichtig','Dringend'];
@@ -2125,7 +2179,7 @@ function sheetBuilding(b){
     if(isSite(b))return h+`<button class="danger" data-act="demo:${b.id}">${demoConfirm===b.id?'⚠️ Sicher? Nochmal tippen':'✖ Baustelle abbrechen (alles zurück)'}</button>`;
   }
   if(b.type==='school'&&!isSite(b)){const n=S.vill.filter(v=>v.kid).length;h+=`<p>🏫 Plätze: ${S.buildings.filter(x=>x.type==='school'&&!isSite(x)).reduce((a,x)=>a+6*x.level,0)} · Kinder im Dorf: ${n}</p>`}
-  if(b.type==='power'&&!isSite(b))h+=`<p>⚡ Strom: ${Math.round(PWR_S)} für ${PWR_D} Betriebe → +${Math.round(PWR*25)} % Produktion</p><p>🔥 Brennstoff: ${S.tech.incinerate&&S.res.trash>1?'🗑️ Müll':S.tech.steam&&S.res.coal>1?'⚫ Kohle (+50 % Strom)':'🪵 Holz'}${S.tech.incinerate?'':' <small>(Müll mit „Müllverbrennung“)</small>'}</p>`;
+  if(b.type==='power'&&!isSite(b))h+=`<p>⚡ ${netOn()?`Netz: ${Math.round(netCalc().pS)} Einheiten erzeugt · Bedarf ${netCalc().pD}`:`Strom: ${Math.round(PWR_S)} für ${PWR_D} Betriebe`}</p><p>🔥 Brennstoff: ${S.tech.incinerate&&S.res.trash>1?'🗑️ Müll':S.tech.steam&&S.res.coal>1?'⚫ Kohle (+50 % Strom)':'🪵 Holz'}${S.tech.incinerate?'':' <small>(Müll mit „Müllverbrennung“)</small>'}</p>`;
   if(b.type==='garage'&&!isSite(b))h+=`<p>🛻 ${VEH?'Fuhrwerke unterwegs: +40 % Tempo, +2 beim Sammeln':'Steht still – braucht Arbeiter und Werkzeug'}</p>`;
   if(b.type==='uni'&&!isSite(b))h+='<p class="desc">Nur Bewohner mit Schulabschluss 🎒 können studieren. Nach dem Studium werden sie automatisch frei.</p>';
   if(b.type==='bank'&&!isSite(b))h+=`<p>🏦 Limit: ${bankCap()} Gold · Kredit bis ${loanMax()}</p><button class="big" style="background:#6a7a8a" data-act="bank">🏦 Zur Bank</button>`;
@@ -2138,6 +2192,8 @@ function sheetBuilding(b){
   if((d.prod||d.conv)&&!isSite(b)){const r0=d.prod?Object.keys(d.prod)[0]:Object.keys(d.conv.out)[0]||null,P=multParts(b,r0).concat(S.res.food<=.001?[['🍎','Hunger',.5]]:[]).concat(b.fire>0?[['🔥','Brand',0]]:[]),m=P.reduce((a,p)=>a*p[2],1);
     h+=`<div style="margin:6px 0"><div data-act="mdet" style="cursor:pointer"><b>📈 Produktion ×${f1(m)}</b> <small>${MDET?'▲ ausblenden':'▼ warum?'}</small></div>${!MDET?'':`<div style="font-size:13px;margin-top:4px">${P.map(p=>`<div style="display:flex;justify-content:space-between"><span>${p[0]} ${p[1]}</span><b style="color:${p[2]>=1?'#2e7d32':'#c0392b'}">×${p[2].toFixed(2).replace('.',',')}</b></div>`).join('')}</div>`}</div>`}
   {const k=distOf(b.type);if(k&&!isSite(b))h+=`<p>🏘️ Bezirk: ${inDist(b)?`✅ im ${DIST[k].i} ${DIST[k].n}-Bezirk → ${b.type==='house'||b.type==='apartment'?'zufriedenere Bewohner':SEATS[b.type]?'+20 % Plätze, +15 % Produktion':'+15 % Produktion'}`:`<span style="color:#b0782a">gehört in einen ${DIST[k].i} ${DIST[k].n}-Bezirk (+15 %)</span>`}${B[b.type].house&&nearLoud(b)?'<br>🔊 <b style="color:#c0392b">Lärm & Dreck von nahem Industriebetrieb!</b>':''}</p>`}
+  if(netOn()&&(needP(b)||needW(b))){const p_=powered(b),w_=watered(b);h+=`<p>${needP(b)?(p_?'⚡ Strom ✅':'⚡ <b style="color:#c0392b">Kein Strom!</b>'):''} ${needW(b)?(w_?'💧 Wasser ✅':'💧 <b style="color:#c0392b">Kein Wasser!</b>'):''}${(!p_||!w_)?'<br><small>Das Gebäude muss an einem Weg liegen, der mit einem Kraftwerk bzw. Wasserwerk verbunden ist – und das Netz muss genug Leistung haben.</small>':''}</p>`}
+  if(b.type==='waterworks'&&!isSite(b)){const n=netCalc();h+=`<p>💧 Netz: ${Math.round(n?n.wS:0)} Einheiten · Bedarf ${n?n.wD:0}${eff(b)>0?'':' – <b style="color:#c0392b">kein Wasser in der Nähe!</b>'}</p>`}
   if(b.fire>0)h+=`<div class="item" style="display:block;border:2px solid #c0392b"><b>🔥 Es brennt!</b>${bar('Gelöscht',b.fx)}<small>${fireCover(b)?'🚒 Die Feuerwehr ist im Einsatz.':'🪣 Die Bewohner löschen mit Eimern – das dauert. Brennt es zu lange, verliert das Gebäude eine Stufe.'}</small></div>`;
   if(b.type==='firestation'&&!isSite(b)){const r=B.firestation.cover+2*(b.level-1),n=S.buildings.filter(o=>fireRiskOf(o)&&Math.hypot(b.x+.5-(o.x+fpW(o.type)/2),b.y+.5-(o.y+fpH(o.type)/2))<=r+.5).length;h+=`<p>🚒 Reichweite: <b>${r} Felder</b> · schützt ${n} Gebäude${wcount(b)?'':' – <b style="color:#c0392b">keine Feuerwehrleute!</b>'}</p>`}
   else if(fireRiskOf(b)&&!isSite(b))h+=`<p>🧯 Brandschutz: ${fireCover(b)?'✅ Feuerwache in Reichweite':'⚠️ keine Feuerwache in Reichweite'}</p>`;
@@ -2359,6 +2415,7 @@ function act(a,p){
     case 'qstart':{if(!buildQ.length)return;if(!canPay(B[buildQ[0]].cost)){toast('Nicht genug Ressourcen');return}const q={qn:buildQ.length};placing={type:buildQ[0],x:null,y:null,q,qi:1,qn:buildQ.length};roadMode=null;demoMode=false;closeSheet();sel=null;updateBanner();break}
     case 'gmove':gm={ids:[],st:'sel',x:null,y:null};placing=null;roadMode=null;demoMode=false;closeSheet();sel=null;updateBanner();break;
     case 'mdet':MDET=!MDET;renderSheet();break;
+    case 'netv':S.netView=!S.netView;renderSheet();break;
     case 'barall':S.barAll=!S.barAll;updateUI();break;
     case 'vtab':VT=p;renderSheet();break;
     case 'advtog':S.advOff=!S.advOff;renderSheet();break;
